@@ -1,14 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { fetchNearbyPOI, poiName, poiIcon, poiType } from './poi.js'
 
-// ─── Constants ────────────────────────────────────────────
 const TABS = [
   { key:'history', icon:'🏛️', label:'Historia'    },
   { key:'legends', icon:'✨', label:'Leyendas'    },
   { key:'food',    icon:'🍽️', label:'Gastronomía' },
   { key:'places',  icon:'🗺️', label:'Monumentos'  },
 ]
-
 const LANGS = [
   { value:'es', label:'🌍 Español',   tts:'es-ES' },
   { value:'en', label:'🌐 English',   tts:'en-US' },
@@ -16,61 +13,71 @@ const LANGS = [
   { value:'it', label:'🏛️ Italiano',  tts:'it-IT' },
   { value:'pt', label:'🎶 Português', tts:'pt-BR' },
 ]
-
 const SYS_LANG = {
-  es:'Responde completamente en español.',
-  en:'Respond entirely in English.',
-  fr:'Réponds entièrement en français.',
-  it:'Rispondi interamente in italiano.',
-  pt:'Responda inteiramente em português.',
+  es: 'Eres un guía turístico experto. REGLAS ESTRICTAS: 1) Responde SIEMPRE en español, sin excepciones. 2) Nunca uses palabras en inglés ni en otro idioma. Si algo se llama "city" di "ciudad", si se llama "tour" di "recorrido". 3) Sin metáforas, sin frases poéticas. 4) Solo datos concretos, fechas, nombres y hechos reales. 5) Tono claro, directo y ameno.',
+  en: 'You are an expert tour guide. STRICT RULES: 1) Always respond in English, no exceptions. 2) Never use words in other languages. 3) No metaphors, no poetic language. 4) Only concrete facts, dates, names and real events. 5) Clear, direct and engaging tone.',
+  fr: 'Tu es un guide touristique expert. RÈGLES STRICTES: 1) Réponds TOUJOURS en français, sans exception. 2) Pas de mots dans d'autres langues. 3) Pas de métaphores ni de langage poétique. 4) Uniquement des faits concrets et dates réelles. 5) Ton clair et direct.',
+  it: 'Sei una guida turistica esperta. REGOLE STRETTE: 1) Rispondi SEMPRE in italiano, senza eccezioni. 2) Niente parole in altre lingue. 3) Niente metafore o linguaggio poetico. 4) Solo fatti concreti, date e eventi reali. 5) Tono chiaro e diretto.',
+  pt: 'Você é um guia turístico especialista. REGRAS ESTRITAS: 1) Responda SEMPRE em português, sem exceções. 2) Nunca use palavras em outros idiomas. 3) Sem metáforas ou linguagem poética. 4) Apenas fatos concretos, datas e eventos reais. 5) Tom claro e direto.',
 }
 
+const LANG_NAMES = { es:'español', en:'English', fr:'français', it:'italiano', pt:'português' }
 const PROMPTS = {
-  history: (place, extra='') =>
-    `Eres un guía histórico experto. Habla con claridad y precisión. Sin frases poéticas. Solo datos reales, fechas y hechos verificables.
-Lugar: ${place}. ${extra}
-Narra la historia en 220-260 palabras:
-- Cuándo fue fundado y por quién
-- Los eventos históricos más importantes
-- Cómo ha cambiado con el tiempo
-- Su importancia hoy
-Empieza directo con los datos históricos.`,
+  history: (place, lang) =>
+    `Lugar: ${place}.
+Narra la historia de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
+- Cuándo fue fundado, por quién y en qué contexto histórico
+- Los hechos y eventos históricos más importantes, con fechas concretas
+- Los personajes históricos relevantes ligados al lugar
+- Cómo evolucionó con el tiempo hasta hoy
+- Su importancia actual
+IMPORTANTE: Sin introducción genérica. Empieza directamente con el primer dato histórico. TODO el texto en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
 
-  legends: (place, extra='') =>
-    `Eres un experto en folclore y mitología. Narra leyendas de forma entretenida, dejando claro que son relatos populares.
-Lugar: ${place}. ${extra}
-Cuenta las leyendas más famosas en 220-260 palabras:
-- La leyenda más conocida con todos sus detalles
-- Otros relatos o supersticiones locales
-- Qué representan culturalmente
-Empieza directamente contando la primera leyenda.`,
+  legends: (place, lang) =>
+    `Lugar: ${place}.
+Cuenta las leyendas y relatos populares de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
+- La leyenda más famosa del lugar, contada con detalle
+- Otros relatos populares, mitos o supersticiones locales
+- El origen conocido de estas historias
+- Por qué estas leyendas siguen siendo parte de la cultura local
+IMPORTANTE: Deja claro que son relatos populares, no hechos históricos. Empieza directamente con la primera leyenda. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
 
-  food: (place, extra='') =>
-    `Eres un crítico gastronómico experto en cocina regional. Habla de forma concreta. Sin metáforas. Información práctica sobre qué comer.
-Lugar: ${place}. ${extra}
-Describe la gastronomía en 220-260 palabras:
-- Los 3-4 platos típicos más representativos con sus ingredientes
-- Bebidas o postres típicos
-- Dónde o cuándo se suelen comer
-- Una curiosidad sobre la cocina local
-Empieza directamente con el primer plato típico.`,
+  food: (place, lang) =>
+    `Lugar: ${place}.
+Describe la gastronomía típica de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
+- Los 4-5 platos más representativos, con sus ingredientes principales y cómo se preparan
+- Las bebidas típicas de la región
+- Los postres o dulces tradicionales
+- En qué ocasiones o lugares se suelen comer estos platos
+- Una curiosidad gastronómica del lugar
+IMPORTANTE: Información práctica y concreta. Sin metáforas sobre sabores. Empieza directamente con el primer plato. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
 
-  monument: (place, type='', city='') =>
-    `Eres un guía turístico experto. Habla con claridad y datos precisos. Sin frases poéticas innecesarias.
-Monumento: ${place}. Tipo: ${type}. Ciudad: ${city}.
-Narra la historia completa en 260-300 palabras:
-- Cuándo fue construido, por quién y con qué propósito
-- Los eventos o personajes históricos más importantes ligados a él
-- Sus características arquitectónicas o artísticas destacadas
-- Por qué vale la pena visitarlo hoy
-Empieza directamente con los datos del monumento.`,
+  monument: (place, type, city, lang) =>
+    `Lugar: ${place}. Tipo: ${type}. Ciudad: ${city}.
+Narra la historia completa en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
+- Cuándo fue construido o creado, por quién y con qué propósito
+- Los eventos o personajes históricos más importantes ligados a él, con fechas
+- Sus características arquitectónicas, artísticas o culturales más destacadas
+- Cómo ha cambiado o sido restaurado con el tiempo
+- Por qué es importante visitarlo hoy y qué puede ver el turista
+IMPORTANTE: Empieza directamente con los datos del lugar. Sin introducción genérica. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
+
+  famous: (city, lang) => {
+    const instrucciones = {
+      es: `Lista los 8 monumentos, museos, plazas e iglesias más importantes de: ${city}. Devuelve SOLO este JSON sin texto adicional ni comillas de código:\n[{"name":"Nombre en español","type":"Tipo en español","icon":"emoji","description":"Una frase en español"}]`,
+      en: `List the 8 most important monuments, museums, squares and churches of: ${city}. Return ONLY this JSON with no extra text or code quotes:\n[{"name":"Name in English","type":"Type in English","icon":"emoji","description":"One sentence in English"}]`,
+      fr: `Liste les 8 monuments, musées, places et églises les plus importants de: ${city}. Retourne UNIQUEMENT ce JSON sans texte ni guillemets de code:\n[{"name":"Nom en français","type":"Type en français","icon":"emoji","description":"Une phrase en français"}]`,
+      it: `Elenca gli 8 monumenti, musei, piazze e chiese più importanti di: ${city}. Restituisci SOLO questo JSON senza testo né virgolette di codice:\n[{"name":"Nome in italiano","type":"Tipo in italiano","icon":"emoji","description":"Una frase in italiano"}]`,
+      pt: `Liste os 8 monumentos, museus, praças e igrejas mais importantes de: ${city}. Retorne APENAS este JSON sem texto nem aspas de código:\n[{"name":"Nome em português","type":"Tipo em português","icon":"emoji","description":"Uma frase em português"}]`,
+    }
+    return instrucciones[lang] || instrucciones.es
+  },
 }
 
 const G='#c8963e', GL='#e8b96a', T='#b05c3a'
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
 const EL_KEY   = import.meta.env.VITE_ELEVENLABS_KEY || ''
-// ElevenLabs Voice: Adam — deep, narrative male
-const EL_VOICE = 'pNInz6obpgDQGcFmaJgB'
+const EL_VOICE = 'pNInz6obpgDQGcFmaJgB' // Adam — deep male voice
 
 // ─── API helpers ──────────────────────────────────────────
 async function askGroq(prompt, key, lang) {
@@ -89,6 +96,28 @@ async function askGroq(prompt, key, lang) {
   if (!r.ok) throw new Error('Groq ' + r.status)
   const d = await r.json()
   return d.choices?.[0]?.message?.content || ''
+}
+
+async function getFamousPlaces(city, key, lang) {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+    body: JSON.stringify({
+      model:'llama-3.3-70b-versatile',
+      messages:[
+        { role:'system', content:'Eres un experto en turismo mundial. Responde SOLO con JSON válido, sin texto adicional, sin backticks, sin markdown.' },
+        { role:'user',   content: PROMPTS.famous(city, lang) },
+      ],
+      max_tokens:600, temperature:0.3,
+    }),
+  })
+  if (!r.ok) throw new Error('Groq ' + r.status)
+  const d = await r.json()
+  const text = d.choices?.[0]?.message?.content || '[]'
+  try {
+    const match = text.match(/\[[\s\S]*\]/)
+    return match ? JSON.parse(match[0]) : []
+  } catch { return [] }
 }
 
 async function elevenLabsTTS(text, key) {
@@ -125,60 +154,18 @@ async function geocodeName(name) {
       { headers:{ 'Accept-Language':'es' } }
     )
     const d = await r.json()
-    if (!d.length) return { full:name, city:name, lat:null, lon:null }
+    if (!d.length) return { full:name, city:name }
     const a = d[0].address||{}
     const city = a.city||a.town||a.village||a.municipality||name
-    return { city, full:[city,a.state,a.country].filter(Boolean).join(', '), lat:parseFloat(d[0].lat), lon:parseFloat(d[0].lon) }
-  } catch { return { full:name, city:name, lat:null, lon:null } }
+    return { city, full:[city,a.state,a.country].filter(Boolean).join(', ') }
+  } catch { return { full:name, city:name } }
 }
 
-// Fetch POIs with larger radius
-async function fetchPOI(lat, lon) {
-  const radius = 500 // 500m radius — wider search
-  const q = `[out:json][timeout:15];(
-    node["historic"](around:${radius},${lat},${lon});
-    node["tourism"~"museum|attraction|monument|artwork|viewpoint|gallery|memorial|yes"](around:${radius},${lat},${lon});
-    node["amenity"~"place_of_worship|theatre|library|cinema"](around:${radius},${lat},${lon});
-    node["leisure"~"park|garden|nature_reserve"](around:${radius},${lat},${lon});
-    node["building"~"cathedral|church|chapel|mosque|synagogue|temple|castle|palace|monument"](around:${radius},${lat},${lon});
-    node["landuse"~"cemetery"](around:${radius},${lat},${lon});
-    way["historic"](around:${radius},${lat},${lon});
-    way["tourism"~"museum|attraction|monument|artwork|viewpoint|gallery|memorial|yes"](around:${radius},${lat},${lon});
-    way["amenity"~"place_of_worship|theatre"](around:${radius},${lat},${lon});
-    way["leisure"~"park|garden"](around:${radius},${lat},${lon});
-    way["building"~"cathedral|church|chapel|mosque|synagogue|temple|castle|palace|monument"](around:${radius},${lat},${lon});
-  );out body center 30;`
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method:'POST', body:'data='+encodeURIComponent(q),
-  })
-  if (!res.ok) throw new Error('Overpass error')
-  const data = await res.json()
-
-  function calcDist(la1,lo1,la2,lo2){const R=6371000,dLat=(la2-la1)*Math.PI/180,dLon=(lo2-lo1)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)))}
-
-  const els = (data.elements||[]).map(el=>({
-    ...el, lat:el.lat??el.center?.lat, lon:el.lon??el.center?.lon,
-  })).filter(el => {
-    if (!el.lat||!el.lon) return false
-    const t = el.tags||{}
-    // Must have a name
-    const name = t.name||t['name:es']||t['name:en']
-    return !!name
-  })
-
-  const withDist = els.map(el=>({...el, dist:calcDist(lat,lon,el.lat,el.lon)})).sort((a,b)=>a.dist-b.dist)
-  const seen = new Set()
-  return withDist.filter(el=>{
-    const n = poiName(el)
-    if(seen.has(n)) return false
-    seen.add(n); return true
-  }).slice(0,12)
-}
-
-// ─── UI helpers ───────────────────────────────────────────
+// ─── UI Components ────────────────────────────────────────
 function Spin({size=14}) {
   return <span style={{display:'inline-block',width:size,height:size,border:'2px solid rgba(255,255,255,.25)',borderTopColor:'#fff',borderRadius:'50%',animation:'wtspin .7s linear infinite',verticalAlign:'middle',flexShrink:0}}/>
 }
+
 function Card({label, children, highlight=false}) {
   return (
     <div style={{background:highlight?'rgba(200,150,62,.07)':'rgba(245,239,224,.04)',border:`1px solid ${highlight?'rgba(200,150,62,.4)':'rgba(200,150,62,.22)'}`,borderRadius:14,padding:'1.1rem',position:'relative',overflow:'hidden'}}>
@@ -188,42 +175,44 @@ function Card({label, children, highlight=false}) {
     </div>
   )
 }
-function Pill({type='info',children}) {
+
+function Pill({type='info', children}) {
   const s={
-    info: {bg:'rgba(200,150,62,.08)',border:'rgba(200,150,62,.2)', color:'rgba(245,239,224,.65)'},
-    ok:   {bg:'rgba(90,122,94,.12)', border:'rgba(90,122,94,.3)',  color:'#a8d8a8'},
-    error:{bg:'rgba(176,92,58,.12)', border:'rgba(176,92,58,.35)', color:'#e8a8a8'},
+    info: {bg:'rgba(200,150,62,.08)',border:'rgba(200,150,62,.2)',color:'rgba(245,239,224,.65)'},
+    ok:   {bg:'rgba(90,122,94,.12)', border:'rgba(90,122,94,.3)', color:'#a8d8a8'},
+    error:{bg:'rgba(176,92,58,.12)', border:'rgba(176,92,58,.35)',color:'#e8a8a8'},
   }[type]||{}
   return <div style={{padding:'.55rem .85rem',borderRadius:9,fontFamily:'sans-serif',fontSize:'.7rem',lineHeight:1.55,background:s.bg,border:`1px solid ${s.border}`,color:s.color}}>{children}</div>
 }
-function POICard({poi, onSelect, selected}) {
-  const name=poiName(poi), icon=poiIcon(poi), type=poiType(poi), close=poi.dist<=80
+
+function PlaceCard({place, onSelect, selected}) {
   return (
-    <button onClick={()=>onSelect(poi)}
-      style={{width:'100%',textAlign:'left',padding:'.75rem .9rem',background:selected?'rgba(200,150,62,.15)':close?'rgba(200,150,62,.07)':'rgba(245,239,224,.03)',border:`1px solid ${selected?'rgba(200,150,62,.5)':close?'rgba(200,150,62,.3)':'rgba(245,239,224,.08)'}`,borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',gap:'.75rem',transition:'all .2s'}}>
-      <span style={{fontSize:'1.4rem',flexShrink:0}}>{icon}</span>
+    <button onClick={()=>onSelect(place)}
+      style={{width:'100%',textAlign:'left',padding:'.75rem .9rem',background:selected?'rgba(200,150,62,.15)':'rgba(245,239,224,.03)',border:`1px solid ${selected?'rgba(200,150,62,.5)':'rgba(245,239,224,.08)'}`,borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',gap:'.75rem',transition:'all .2s'}}>
+      <span style={{fontSize:'1.5rem',flexShrink:0}}>{place.icon||'🏛️'}</span>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'.95rem',color:selected?GL:'#f5efe0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{name}</div>
-        <div style={{fontFamily:'sans-serif',fontSize:'.62rem',color:'rgba(245,239,224,.4)',marginTop:'.12rem'}}>{type}</div>
-      </div>
-      <div style={{flexShrink:0,textAlign:'right'}}>
-        <div style={{fontFamily:'sans-serif',fontSize:'.68rem',fontWeight:700,color:close?'#a8d8a8':G}}>{poi.dist}m</div>
-        {close&&<div style={{fontFamily:'sans-serif',fontSize:'.55rem',color:'#a8d8a8'}}>¡Estás aquí!</div>}
+        <div style={{fontFamily:'Georgia,serif',fontSize:'.95rem',color:selected?GL:'#f5efe0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{place.name}</div>
+        <div style={{fontFamily:'sans-serif',fontSize:'.62rem',color:'rgba(245,239,224,.4)',marginTop:'.12rem'}}>{place.type} {place.description ? '· '+place.description : ''}</div>
       </div>
     </button>
   )
 }
 
-function Player({story, ctx, playing, progress, audioCtx, spd, onToggle, onRestart, onSpeed}) {
+function Player({ctx, playing, progress, audioCtx, spd, onToggle, onRestart, onSpeed, audioLoading}) {
   const isActive = audioCtx===ctx
   return (
     <>
       <div style={{height:1,background:'rgba(200,150,62,.15)',marginBottom:'1rem'}}/>
-      {EL_KEY && <div style={{display:'flex',alignItems:'center',gap:'.4rem',marginBottom:'.6rem'}}><div style={{width:6,height:6,borderRadius:'50%',background:'#10b981'}}/><span style={{fontFamily:'sans-serif',fontSize:'.62rem',color:'#10b981',fontWeight:500}}>Voz ElevenLabs — Adam</span></div>}
+      {EL_KEY && (
+        <div style={{display:'flex',alignItems:'center',gap:'.4rem',marginBottom:'.6rem'}}>
+          <div style={{width:6,height:6,borderRadius:'50%',background:'#10b981'}}/>
+          <span style={{fontFamily:'sans-serif',fontSize:'.62rem',color:'#10b981',fontWeight:500}}>Voz ElevenLabs — Adam</span>
+        </div>
+      )}
       <div style={{display:'flex',alignItems:'center',gap:'.9rem'}}>
-        <button onClick={onToggle}
-          style={{width:52,height:52,borderRadius:'50%',background:`linear-gradient(135deg,${G},${T})`,border:'none',cursor:'pointer',fontSize:'1.2rem',flexShrink:0,boxShadow:'0 4px 16px rgba(200,150,62,.4)',display:'flex',alignItems:'center',justifyContent:'center',animation:playing&&isActive?'wtpulse 2s infinite':''}}>
-          {playing&&isActive?'⏸️':'▶️'}
+        <button onClick={onToggle} disabled={audioLoading}
+          style={{width:52,height:52,borderRadius:'50%',background:`linear-gradient(135deg,${G},${T})`,border:'none',cursor:audioLoading?'wait':'pointer',fontSize:'1.2rem',flexShrink:0,boxShadow:'0 4px 16px rgba(200,150,62,.4)',display:'flex',alignItems:'center',justifyContent:'center',animation:playing&&isActive?'wtpulse 2s infinite':''}}>
+          {audioLoading&&isActive ? <Spin size={20}/> : playing&&isActive ? '⏸️' : '▶️'}
         </button>
         <div style={{flex:1}}>
           <div style={{height:4,background:'rgba(200,150,62,.15)',borderRadius:2,overflow:'hidden',marginBottom:'.35rem'}}>
@@ -231,8 +220,8 @@ function Player({story, ctx, playing, progress, audioCtx, spd, onToggle, onResta
           </div>
           <div style={{display:'flex',justifyContent:'space-between',fontFamily:'sans-serif',fontSize:'.6rem',color:'rgba(245,239,224,.3)'}}>
             <span>{isActive?Math.round(progress*100):0}%</span>
-            <span style={{color:playing&&isActive?'#a0d0a0':isActive&&progress>0?'#d0c080':'rgba(245,239,224,.3)'}}>
-              {playing&&isActive?'🔊 reproduciendo':isActive&&progress>0?'⏸ pausado':'toca ▶ para escuchar'}
+            <span style={{color:audioLoading&&isActive?'#d0c080':playing&&isActive?'#a0d0a0':isActive&&progress>0?'#d0c080':'rgba(245,239,224,.3)'}}>
+              {audioLoading&&isActive?'⏳ generando audio...':playing&&isActive?'🔊 reproduciendo':isActive&&progress>0?'⏸ pausado':'toca ▶ para escuchar'}
             </span>
           </div>
         </div>
@@ -243,14 +232,8 @@ function Player({story, ctx, playing, progress, audioCtx, spd, onToggle, onResta
         </div>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'.7rem'}}>
-        <button onClick={onSpeed}
-          style={{fontFamily:'sans-serif',fontSize:'.62rem',fontWeight:700,background:'rgba(200,150,62,.1)',border:'1px solid rgba(200,150,62,.28)',color:G,padding:'.22rem .65rem',borderRadius:20,cursor:'pointer'}}>
-          {spd}× velocidad
-        </button>
-        <button onClick={onRestart}
-          style={{fontFamily:'sans-serif',fontSize:'.62rem',background:'none',border:'none',color:'rgba(245,239,224,.35)',cursor:'pointer'}}>
-          ↺ Reiniciar
-        </button>
+        <button onClick={onSpeed} style={{fontFamily:'sans-serif',fontSize:'.62rem',fontWeight:700,background:'rgba(200,150,62,.1)',border:'1px solid rgba(200,150,62,.28)',color:G,padding:'.22rem .65rem',borderRadius:20,cursor:'pointer'}}>{spd}× velocidad</button>
+        <button onClick={onRestart} style={{fontFamily:'sans-serif',fontSize:'.62rem',background:'none',border:'none',color:'rgba(245,239,224,.35)',cursor:'pointer'}}>↺ Reiniciar</button>
       </div>
     </>
   )
@@ -270,24 +253,25 @@ export default function App() {
   const [gpsPhase,  setGpsPhase]  = useState('idle')
   const [gpsMsg,    setGpsMsg]    = useState('')
   const [geoInfo,   setGeoInfo]   = useState(null)
-  const [coords,    setCoords]    = useState(null)
 
   const [stories,   setStories]   = useState({})
   const [shown,     setShown]     = useState({})
 
-  const [pois,      setPois]      = useState([])
-  const [selPoi,    setSelPoi]    = useState(null)
-  const [poiStory,  setPoiStory]  = useState('')
-  const [poiShown,  setPoiShown]  = useState('')
-  const [poiBusy,   setPoiBusy]   = useState(false)
+  // Famous places from AI
+  const [places,      setPlaces]      = useState([])
+  const [loadingPlaces, setLoadingPlaces] = useState(false)
+  const [selPlace,    setSelPlace]    = useState(null)
+  const [placeStory,  setPlaceStory]  = useState('')
+  const [placeShown,  setPlaceShown]  = useState('')
+  const [placeBusy,   setPlaceBusy]   = useState(false)
 
-  const [err,       setErr]       = useState('')
-  const [playing,   setPlaying]   = useState(false)
-  const [progress,  setProgress]  = useState(0)
-  const [spd,       setSpd]       = useState(1.0)
-  const [audioCtx,  setAudioCtx]  = useState(null)
-  const [audioLoading,setAudioLoading]=useState(false)
-  const [audioSrc,  setAudioSrc]  = useState({}) // {tab: url, poi: url}
+  const [err,          setErr]         = useState('')
+  const [playing,      setPlaying]     = useState(false)
+  const [progress,     setProgress]    = useState(0)
+  const [spd,          setSpd]         = useState(1.0)
+  const [audioCtx,     setAudioCtx]    = useState(null)
+  const [audioLoading, setAudioLoading]= useState(false)
+  const [audioUrls,    setAudioUrls]   = useState({})
 
   const typeTimers = useRef({})
   const progTimer  = useRef(null)
@@ -295,33 +279,34 @@ export default function App() {
   const spdRef     = useRef(1.0)
   const audioRef   = useRef(null)
 
-  useEffect(() => { spdRef.current = spd }, [spd])
-  useEffect(() => {
+  useEffect(()=>{ spdRef.current = spd },[spd])
+  useEffect(()=>{
     window.speechSynthesis?.getVoices()
-    const h = () => window.speechSynthesis.getVoices()
-    window.speechSynthesis?.addEventListener('voiceschanged', h)
-    return () => {
-      window.speechSynthesis?.removeEventListener('voiceschanged', h)
+    const h=()=>window.speechSynthesis.getVoices()
+    window.speechSynthesis?.addEventListener('voiceschanged',h)
+    return()=>{
+      window.speechSynthesis?.removeEventListener('voiceschanged',h)
       Object.values(typeTimers.current).forEach(clearInterval)
       clearInterval(progTimer.current)
       window.speechSynthesis?.cancel()
     }
-  }, [])
+  },[])
 
-  function typewrite(text, setterKey) {
-    if (typeTimers.current[setterKey]) clearInterval(typeTimers.current[setterKey])
-    if (setterKey === 'poi') { setPoiShown('') }
-    else setShown(p=>({...p,[setterKey]:''}))
-    const words = text.split(' '); let i=0
-    typeTimers.current[setterKey] = setInterval(() => {
-      i++
-      const chunk = words.slice(0,i).join(' ')
-      if (setterKey==='poi') setPoiShown(chunk)
-      else setShown(p=>({...p,[setterKey]:chunk}))
-      if (i>=words.length) clearInterval(typeTimers.current[setterKey])
-    }, 22)
+  // ── Typewriter ─────────────────────────────────────────
+  function typewrite(text, key) {
+    if (typeTimers.current[key]) clearInterval(typeTimers.current[key])
+    if (key==='place') setPlaceShown('')
+    else setShown(p=>({...p,[key]:''}))
+    const words=text.split(' '); let i=0
+    typeTimers.current[key]=setInterval(()=>{
+      i++; const chunk=words.slice(0,i).join(' ')
+      if (key==='place') setPlaceShown(chunk)
+      else setShown(p=>({...p,[key]:chunk}))
+      if (i>=words.length) clearInterval(typeTimers.current[key])
+    },22)
   }
 
+  // ── Audio ──────────────────────────────────────────────
   function stopAudio() {
     clearInterval(progTimer.current)
     try { window.speechSynthesis.cancel() } catch {}
@@ -330,193 +315,166 @@ export default function App() {
   }
 
   function startBrowserTTS(text, ctx) {
-    const synth = window.speechSynthesis
-    const ttsTag = LANGS.find(l=>l.value===lang)?.tts||'es-ES'
-    const voices = synth.getVoices()
-    const voice = voices.find(v=>v.lang===ttsTag)||voices.find(v=>v.lang.startsWith(lang+'-'))||voices.find(v=>v.lang.startsWith(lang))||null
-    const parts = text.match(/[^.!?]+[.!?]*/g)||[text]
-    const totalSec = (text.split(/\s+/).length/130)*60/spdRef.current
-    const t0 = Date.now()
-    progTimer.current = setInterval(()=>{
-      try{if(synth.paused)synth.resume()}catch{}
-      setProgress(Math.min((Date.now()-t0)/1000/totalSec,.99))
-    },400)
+    const synth=window.speechSynthesis
+    const ttsTag=LANGS.find(l=>l.value===lang)?.tts||'es-ES'
+    const voices=synth.getVoices()
+    const voice=voices.find(v=>v.lang===ttsTag)||voices.find(v=>v.lang.startsWith(lang+'-'))||voices.find(v=>v.lang.startsWith(lang))||null
+    const parts=text.match(/[^.!?]+[.!?]*/g)||[text]
+    const totalSec=(text.split(/\s+/).length/130)*60/spdRef.current
+    const t0=Date.now()
+    progTimer.current=setInterval(()=>{try{if(synth.paused)synth.resume()}catch{};setProgress(Math.min((Date.now()-t0)/1000/totalSec,.99))},400)
     let idx=0
     function next(){
       if(idx>=parts.length){clearInterval(progTimer.current);setPlaying(false);setProgress(1);return}
-      const u=new SpeechSynthesisUtterance(parts[idx])
-      u.rate=spdRef.current;u.pitch=1;u.volume=1;if(voice)u.voice=voice
-      u.onend=()=>{idx++;next()}
-      u.onerror=e=>{if(e.error!=='interrupted'){clearInterval(progTimer.current);setPlaying(false)}}
+      const u=new SpeechSynthesisUtterance(parts[idx]);u.rate=spdRef.current;u.pitch=1;u.volume=1;if(voice)u.voice=voice
+      u.onend=()=>{idx++;next()};u.onerror=e=>{if(e.error!=='interrupted'){clearInterval(progTimer.current);setPlaying(false)}}
       synth.speak(u);idx++
     }
     storyRef.current=text; setAudioCtx(ctx); setPlaying(true); setProgress(0); next()
   }
 
-  async function playWithEL(text, ctx) {
-    // Check if we already have audio for this context
-    if (audioSrc[ctx]) {
+  async function playEL(text, ctx) {
+    if (audioUrls[ctx]) {
       if (audioRef.current) {
-        audioRef.current.src = audioSrc[ctx]
-        audioRef.current.playbackRate = spdRef.current
-        audioRef.current.play()
-        setAudioCtx(ctx); setPlaying(true)
-        audioRef.current.ontimeupdate = () => {
-          if(audioRef.current) setProgress(audioRef.current.currentTime/audioRef.current.duration)
-        }
-        audioRef.current.onended = () => { setPlaying(false); setProgress(1) }
+        audioRef.current.src=audioUrls[ctx]; audioRef.current.playbackRate=spdRef.current
+        audioRef.current.play(); setAudioCtx(ctx); setPlaying(true)
+        audioRef.current.ontimeupdate=()=>{ if(audioRef.current) setProgress(audioRef.current.currentTime/audioRef.current.duration) }
+        audioRef.current.onended=()=>{ setPlaying(false); setProgress(1) }
       }
       return
     }
-    setAudioLoading(true)
+    setAudioLoading(true); setAudioCtx(ctx)
     try {
-      const url = await elevenLabsTTS(text, EL_KEY)
-      setAudioSrc(p=>({...p,[ctx]:url}))
-      setAudioLoading(false)
+      const url=await elevenLabsTTS(text, EL_KEY)
+      setAudioUrls(p=>({...p,[ctx]:url})); setAudioLoading(false)
       if (audioRef.current) {
-        audioRef.current.src = url
-        audioRef.current.playbackRate = spdRef.current
-        audioRef.current.play()
-        setAudioCtx(ctx); setPlaying(true); setProgress(0)
-        audioRef.current.ontimeupdate = () => {
-          if(audioRef.current) setProgress(audioRef.current.currentTime/audioRef.current.duration)
-        }
-        audioRef.current.onended = () => { setPlaying(false); setProgress(1) }
+        audioRef.current.src=url; audioRef.current.playbackRate=spdRef.current
+        audioRef.current.play(); setPlaying(true); setProgress(0)
+        audioRef.current.ontimeupdate=()=>{ if(audioRef.current) setProgress(audioRef.current.currentTime/audioRef.current.duration) }
+        audioRef.current.onended=()=>{ setPlaying(false); setProgress(1) }
       }
-    } catch {
-      setAudioLoading(false)
-      startBrowserTTS(text, ctx)
-    }
+    } catch { setAudioLoading(false); startBrowserTTS(text,ctx) }
   }
 
   async function toggleAudio(text, ctx) {
-    if (playing && audioCtx===ctx) {
-      if (EL_KEY && audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause(); setPlaying(false)
-      } else {
-        window.speechSynthesis.pause(); clearInterval(progTimer.current); setPlaying(false)
-      }
+    if (playing&&audioCtx===ctx) {
+      if (EL_KEY&&audioRef.current&&!audioRef.current.paused) { audioRef.current.pause(); setPlaying(false) }
+      else { window.speechSynthesis.pause(); clearInterval(progTimer.current); setPlaying(false) }
       return
     }
-    if (audioCtx===ctx && !playing) {
-      if (EL_KEY && audioRef.current && audioRef.current.paused && audioRef.current.src) {
-        audioRef.current.play(); setPlaying(true); return
-      }
-      if (!EL_KEY && window.speechSynthesis.paused) {
+    if (!playing&&audioCtx===ctx) {
+      if (EL_KEY&&audioRef.current?.paused&&audioRef.current?.src) { audioRef.current.play(); setPlaying(true); return }
+      if (!EL_KEY&&window.speechSynthesis.paused) {
         window.speechSynthesis.resume()
         const totalSec=(storyRef.current.split(/\s+/).length/130)*60/spdRef.current
         const t0=Date.now()-progress*totalSec*1000
-        progTimer.current=setInterval(()=>{try{if(window.speechSynthesis.paused)window.speechSynthesis.resume()}catch{}setProgress(Math.min((Date.now()-t0)/1000/totalSec,.99))},400)
+        progTimer.current=setInterval(()=>{try{if(window.speechSynthesis.paused)window.speechSynthesis.resume()}catch{};setProgress(Math.min((Date.now()-t0)/1000/totalSec,.99))},400)
         setPlaying(true); return
       }
     }
     stopAudio()
-    if (EL_KEY) await playWithEL(text, ctx)
-    else startBrowserTTS(text, ctx)
+    if (EL_KEY) await playEL(text,ctx)
+    else startBrowserTTS(text,ctx)
   }
 
+  // ── Generate story ─────────────────────────────────────
   async function generateTab(tab, place) {
-    if (stories[tab] && stories[tab]!=='error') return
-    setStories(p=>({...p,[tab]:'loading'}))
-    setErr('')
+    if (stories[tab]&&stories[tab]!=='error') return
+    setStories(p=>({...p,[tab]:'loading'})); setErr('')
     try {
-      const promptFn = PROMPTS[tab]||PROMPTS.history
-      const text = await askGroq(promptFn(place), GROQ_KEY, lang)
-      setStories(p=>({...p,[tab]:text}))
-      typewrite(text, tab)
-      setAudioSrc(p=>({...p,[tab]:null})) // reset audio for new story
-    } catch {
-      setStories(p=>({...p,[tab]:'error'}))
-      setErr('Error al generar. Verifica tu API key de Groq.')
-    }
+      const text=await askGroq(PROMPTS[tab](place, lang), GROQ_KEY, lang)
+      setStories(p=>({...p,[tab]:text})); typewrite(text,tab)
+      setAudioUrls(p=>({...p,[tab]:null}))
+    } catch { setStories(p=>({...p,[tab]:'error'})); setErr('Error al generar.') }
   }
 
+  // ── Load famous places from AI ─────────────────────────
+  async function loadFamousPlaces(city) {
+    setLoadingPlaces(true); setPlaces([])
+    try {
+      const list=await getFamousPlaces(city, GROQ_KEY, lang)
+      setPlaces(list)
+    } catch { setPlaces([]) }
+    setLoadingPlaces(false)
+  }
+
+  // ── GPS ────────────────────────────────────────────────
   async function detectGPS() {
     if (!navigator.geolocation) { setGpsPhase('error'); setGpsMsg('Tu navegador no soporta GPS.'); return }
     setGpsPhase('detecting'); setGpsMsg('Solicitando permiso...')
-    setErr(''); setStories({}); setShown({}); setPois([]); setSelPoi(null)
-    setPoiStory(''); setPoiShown(''); setAudioSrc({}); stopAudio()
+    setErr(''); setStories({}); setShown({}); setPlaces([]); setSelPlace(null)
+    setPlaceStory(''); setPlaceShown(''); setAudioUrls({}); stopAudio(); setBusy(true)
 
-    navigator.geolocation.getCurrentPosition(async pos => {
-      const { latitude:lat, longitude:lon } = pos.coords
-      setCoords({lat,lon})
-      setGpsPhase('scanning'); setGpsMsg('Identificando ubicación y monumentos...')
-
-      const [geoRes, poisRes] = await Promise.allSettled([
-        reverseGeocode(lat, lon),
-        fetchPOI(lat, lon),
-      ])
-      const geo = geoRes.status==='fulfilled' ? geoRes.value : { full:'Tu ubicación', city:'Este lugar', neighbourhood:'' }
-      const nearby = poisRes.status==='fulfilled' ? poisRes.value : []
-
-      setGeoInfo(geo); setPois(nearby); setGpsPhase('done')
-      setGpsMsg(`${geo.neighbourhood ? geo.neighbourhood+', ' : ''}${geo.full} — ${nearby.length} lugares encontrados`)
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      const{latitude:lat,longitude:lon}=pos.coords
+      setGpsPhase('scanning'); setGpsMsg('Identificando tu ubicación...')
+      try {
+        const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`,{headers:{'Accept-Language':'es'}})
+        const d=await r.json(); const a=d.address||{}
+        const city=a.city||a.town||a.village||a.municipality||a.county||'Tu ubicación'
+        const geo={city,neighbourhood:a.suburb||a.neighbourhood||'',state:a.state||'',country:a.country||'',full:[city,a.state,a.country].filter(Boolean).join(', ')}
+        setGeoInfo(geo); setGpsPhase('done')
+        setGpsMsg(`📍 ${geo.neighbourhood?geo.neighbourhood+', ':''}${geo.full}`)
+        await generateTab('history',geo.full)
+        loadFamousPlaces(geo.city)
+      } catch {
+        setGpsPhase('error'); setGpsMsg('No se pudo identificar el lugar.')
+      }
       setBusy(false)
-      await generateTab('history', geo.full)
-
-    }, e => {
+    },e=>{
       setGpsPhase('error')
       setGpsMsg({1:'Permiso denegado. Actívalo en tu navegador.',2:'No se pudo determinar la posición.',3:'Tiempo agotado.'}[e.code]||'Error de GPS.')
       setBusy(false)
-    }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 })
-
-    setBusy(true)
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:0})
   }
 
+  // ── Manual search ──────────────────────────────────────
   async function searchManual() {
-    const q = cityInput.trim(); if (!q||busy) return
-    setErr(''); setStories({}); setShown({}); setPois([]); setSelPoi(null)
-    setPoiStory(''); setPoiShown(''); setAudioSrc({}); stopAudio(); setBusy(true)
-    const geo = await geocodeName(q)
-    setGeoInfo({ full:geo.full, city:geo.city, neighbourhood:'' })
-    setGpsMsg(geo.full); setGpsPhase('done')
-    if (geo.lat&&geo.lon) {
-      setCoords({lat:geo.lat,lon:geo.lon})
-      try { const p=await fetchPOI(geo.lat,geo.lon); setPois(p) } catch {}
-    }
-    await generateTab('history', geo.full)
+    const q=cityInput.trim(); if(!q||busy) return
+    setErr(''); setStories({}); setShown({}); setPlaces([]); setSelPlace(null)
+    setPlaceStory(''); setPlaceShown(''); setAudioUrls({}); stopAudio(); setBusy(true)
+    const geo=await geocodeName(q)
+    setGeoInfo({full:geo.full,city:geo.city,neighbourhood:''})
+    setGpsMsg(`📍 ${geo.full}`); setGpsPhase('done')
+    await generateTab('history',geo.full)
+    loadFamousPlaces(geo.city)
     setBusy(false)
   }
 
+  // ── Switch tab ─────────────────────────────────────────
   async function switchTab(tab) {
     setActiveTab(tab); stopAudio()
-    if (tab!=='places' && geoInfo && (!stories[tab]||stories[tab]==='error')) {
-      await generateTab(tab, geoInfo.full)
+    if (tab!=='places'&&geoInfo&&(!stories[tab]||stories[tab]==='error')) {
+      await generateTab(tab,geoInfo.full)
     }
   }
 
-  async function selectPoi(poi) {
-    const name=poiName(poi)
-    if (selPoi===poi) return
-    setSelPoi(poi); stopAudio(); setPoiBusy(true); setPoiStory(''); setPoiShown('')
-    setAudioSrc(p=>({...p,poi:null}))
+  // ── Select place ───────────────────────────────────────
+  async function selectPlace(place) {
+    if (selPlace?.name===place.name) return
+    setSelPlace(place); stopAudio(); setPlaceBusy(true); setPlaceStory(''); setPlaceShown('')
+    setAudioUrls(p=>({...p,place:null}))
     try {
-      const text = await askGroq(PROMPTS.monument(name, poiType(poi), geoInfo?.full||''), GROQ_KEY, lang)
-      setPoiStory(text); typewrite(text, 'poi')
+      const text=await askGroq(PROMPTS.monument(place.name, place.type, geoInfo?.city||'', lang), GROQ_KEY, lang)
+      setPlaceStory(text); typewrite(text,'place')
     } catch { setErr('Error al narrar el monumento.') }
-    setPoiBusy(false)
+    setPlaceBusy(false)
   }
 
   const place    = geoInfo?.full||''
-  const curStory = activeTab!=='places' ? (stories[activeTab]||'') : ''
-  const curShown = activeTab!=='places' ? (shown[activeTab]||'')   : ''
-  const curDone  = !!curStory && curStory!=='loading' && curStory!=='error' && curShown===curStory
-  const poiDone  = !!poiStory && poiShown===poiStory
-
-  const handleSpeed = (currentStory, ctx) => {
-    const o=[0.75,1.0,1.25,1.5]; const next=o[(o.indexOf(spd)+1)%o.length]; setSpd(next)
-    if (playing && !EL_KEY) { stopAudio(); setTimeout(()=>startBrowserTTS(currentStory,ctx),100) }
-    if (playing && EL_KEY && audioRef.current) { audioRef.current.playbackRate=next }
-  }
+  const curStory = activeTab!=='places'?(stories[activeTab]||''):''
+  const curShown = activeTab!=='places'?(shown[activeTab]||''):''
+  const curDone  = !!curStory&&curStory!=='loading'&&curStory!=='error'&&curShown===curStory
+  const placeDone= !!placeStory&&placeShown===placeStory
 
   return (
     <>
       <style>{`
-        @keyframes wtspin  {to{transform:rotate(360deg)}}
-        @keyframes wtblink {0%,50%{opacity:1}51%,100%{opacity:0}}
-        @keyframes wtpulse {0%,100%{box-shadow:0 0 0 0 rgba(200,150,62,.4)}50%{box-shadow:0 0 0 14px rgba(200,150,62,0)}}
-        @keyframes wtfade  {from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        *{box-sizing:border-box;}
+        @keyframes wtspin{to{transform:rotate(360deg)}}
+        @keyframes wtblink{0%,50%{opacity:1}51%,100%{opacity:0}}
+        @keyframes wtpulse{0%,100%{box-shadow:0 0 0 0 rgba(200,150,62,.4)}50%{box-shadow:0 0 0 14px rgba(200,150,62,0)}}
+        @keyframes wtfade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        *{box-sizing:border-box}
         ::-webkit-scrollbar{width:4px}
         ::-webkit-scrollbar-thumb{background:rgba(200,150,62,.3);border-radius:2px}
       `}</style>
@@ -531,7 +489,7 @@ export default function App() {
           <div style={{fontFamily:'sans-serif',fontSize:'.58rem',letterSpacing:'.3em',textTransform:'uppercase',color:'rgba(245,239,224,.35)',marginTop:'.2rem'}}>Audioguía histórica con inteligencia artificial</div>
         </div>
 
-        {/* API Key */}
+        {/* API Key screen */}
         {!keySaved ? (
           <Card label="🔑 API Key de Groq">
             <p style={{fontFamily:'sans-serif',fontSize:'.73rem',color:'rgba(245,239,224,.65)',lineHeight:1.65,marginBottom:'.85rem'}}>
@@ -562,18 +520,18 @@ export default function App() {
             </div>
 
             {/* GPS */}
-            {inputMode==='gps' && (
+            {inputMode==='gps'&&(
               <Card label="Detección de ubicación">
                 <button onClick={detectGPS} disabled={busy}
                   style={{width:'100%',padding:'.85rem',background:busy?'rgba(200,150,62,.3)':`linear-gradient(135deg,${G},${T})`,border:'none',borderRadius:9,color:'#faf6ed',fontFamily:'sans-serif',fontSize:'.75rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',cursor:busy?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'.6rem',animation:gpsPhase==='detecting'||gpsPhase==='scanning'?'wtpulse 2s infinite':''}}>
-                  {gpsPhase==='detecting'||gpsPhase==='scanning'?<><Spin/>{gpsPhase==='scanning'?'Buscando monumentos...':'Detectando...'}</>:'📡 Detectar mi ubicación'}
+                  {gpsPhase==='detecting'||gpsPhase==='scanning'?<><Spin/>{gpsPhase==='scanning'?'Identificando...':'Detectando...'}</>:'📡 Detectar mi ubicación'}
                 </button>
-                {gpsMsg&&<div style={{marginTop:'.7rem'}}><Pill type={gpsPhase==='error'?'error':gpsPhase==='done'?'ok':'info'}>{gpsPhase==='detecting'||gpsPhase==='scanning'?'⏳ ':gpsPhase==='done'?'📍 ':gpsPhase==='error'?'❌ ':''}{gpsMsg}</Pill></div>}
+                {gpsMsg&&<div style={{marginTop:'.7rem'}}><Pill type={gpsPhase==='error'?'error':gpsPhase==='done'?'ok':'info'}>{gpsPhase==='detecting'||gpsPhase==='scanning'?'⏳ ':''}{gpsMsg}</Pill></div>}
               </Card>
             )}
 
             {/* Manual */}
-            {inputMode==='manual' && (
+            {inputMode==='manual'&&(
               <Card label="Buscar ciudad">
                 <div style={{display:'flex',gap:'.5rem'}}>
                   <input type="text" placeholder="Roma, Santiago, Tokio..."
@@ -589,11 +547,11 @@ export default function App() {
               </Card>
             )}
 
-            {/* Language selector */}
-            {geoInfo && (
+            {/* Language */}
+            {geoInfo&&(
               <div style={{display:'flex',alignItems:'center',gap:'.75rem'}}>
                 <span style={{fontFamily:'sans-serif',fontSize:'.62rem',color:'rgba(245,239,224,.4)',whiteSpace:'nowrap'}}>Idioma:</span>
-                <select value={lang} onChange={e=>{setLang(e.target.value);setStories({});setShown({});setAudioSrc({})}}
+                <select value={lang} onChange={e=>{setLang(e.target.value);setStories({});setShown({});setPlaces([]);setAudioUrls({})}}
                   style={{flex:1,background:'rgba(245,239,224,.06)',border:'1px solid rgba(200,150,62,.22)',borderRadius:8,color:'#f5efe0',fontFamily:'sans-serif',fontSize:'.78rem',padding:'.4rem .7rem',outline:'none',cursor:'pointer'}}>
                   {LANGS.map(l=><option key={l.value} value={l.value} style={{background:'#1a1208'}}>{l.label}</option>)}
                 </select>
@@ -602,9 +560,10 @@ export default function App() {
 
             {err&&<Pill type="error">❌ {err}</Pill>}
 
-            {/* Content tabs */}
-            {geoInfo && (
+            {/* Content */}
+            {geoInfo&&(
               <>
+                {/* Tab bar */}
                 <div style={{display:'flex',gap:'.3rem',overflowX:'auto',paddingBottom:'.1rem'}}>
                   {TABS.map(t=>(
                     <button key={t.key} onClick={()=>switchTab(t.key)}
@@ -615,27 +574,23 @@ export default function App() {
                 </div>
 
                 {/* Story tabs */}
-                {activeTab!=='places' && (
+                {activeTab!=='places'&&(
                   <Card label={`${TABS.find(t=>t.key===activeTab)?.icon} ${TABS.find(t=>t.key===activeTab)?.label} — ${place}`} highlight={curDone}>
-                    {stories[activeTab]==='loading'||(!stories[activeTab]&&busy) ? (
-                      <div style={{display:'flex',alignItems:'center',gap:'.6rem',color:'rgba(245,239,224,.5)',fontFamily:'sans-serif',fontSize:'.75rem',padding:'.5rem 0'}}>
-                        <Spin/> Generando...
-                      </div>
-                    ) : stories[activeTab]==='error' ? (
+                    {stories[activeTab]==='loading'||(!stories[activeTab]&&busy)?(
+                      <div style={{display:'flex',alignItems:'center',gap:'.6rem',color:'rgba(245,239,224,.5)',fontFamily:'sans-serif',fontSize:'.75rem',padding:'.5rem 0'}}><Spin/> Generando...</div>
+                    ):stories[activeTab]==='error'?(
                       <Pill type="error">Error. <button onClick={()=>generateTab(activeTab,place)} style={{background:'none',border:'none',color:GL,cursor:'pointer',fontFamily:'sans-serif',fontSize:'.7rem'}}>Reintentar</button></Pill>
-                    ) : (
+                    ):(
                       <>
                         <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',lineHeight:1.9,color:'rgba(245,239,224,.87)',fontWeight:300,marginBottom:curDone?'1rem':0,animation:'wtfade .4s ease'}}>
                           {curShown}
                           {!curDone&&curShown&&<span style={{display:'inline-block',width:2,height:'.9em',background:G,verticalAlign:'middle',marginLeft:2,animation:'wtblink .8s infinite'}}/>}
                         </div>
                         {curDone&&(
-                          <Player
-                            story={curStory} ctx={activeTab}
-                            playing={playing} progress={progress} audioCtx={audioCtx} spd={spd}
+                          <Player ctx={activeTab} playing={playing} progress={progress} audioCtx={audioCtx} spd={spd} audioLoading={audioLoading}
                             onToggle={()=>toggleAudio(curStory,activeTab)}
-                            onRestart={()=>{stopAudio();setProgress(0);setAudioSrc(p=>({...p,[activeTab]:null}));setTimeout(()=>toggleAudio(curStory,activeTab),150)}}
-                            onSpeed={()=>handleSpeed(curStory,activeTab)}
+                            onRestart={()=>{stopAudio();setProgress(0);setAudioUrls(p=>({...p,[activeTab]:null}));setTimeout(()=>toggleAudio(curStory,activeTab),150)}}
+                            onSpeed={()=>{const o=[0.75,1.0,1.25,1.5];const next=o[(o.indexOf(spd)+1)%o.length];setSpd(next);if(playing&&EL_KEY&&audioRef.current)audioRef.current.playbackRate=next;else if(playing){stopAudio();setTimeout(()=>startBrowserTTS(curStory,activeTab),100)}}}
                           />
                         )}
                       </>
@@ -644,43 +599,37 @@ export default function App() {
                 )}
 
                 {/* Monuments tab */}
-                {activeTab==='places' && (
+                {activeTab==='places'&&(
                   <>
-                    {pois.length===0 ? (
-                      <Card>
-                        <div style={{fontFamily:'sans-serif',fontSize:'.78rem',color:'rgba(245,239,224,.5)',textAlign:'center',padding:'1rem 0',lineHeight:1.7}}>
-                          {coords ? 'No se encontraron monumentos en un radio de 500m.\nIntenta en una zona con más lugares históricos.' : 'Usa el GPS para detectar monumentos cercanos.\nLa búsqueda cubre un radio de 500 metros.'}
-                        </div>
-                      </Card>
-                    ) : (
-                      <Card label={`🗺️ ${pois.length} lugares encontrados (radio 500m)`}>
+                    <Card label={`⭐ Monumentos principales de ${geoInfo.city}`}>
+                      {loadingPlaces?(
+                        <div style={{display:'flex',alignItems:'center',gap:'.6rem',color:'rgba(245,239,224,.5)',fontFamily:'sans-serif',fontSize:'.75rem',padding:'.5rem 0'}}><Spin/> Buscando los lugares más importantes...</div>
+                      ):places.length===0?(
+                        <div style={{fontFamily:'sans-serif',fontSize:'.78rem',color:'rgba(245,239,224,.4)',padding:'.5rem 0'}}>No se encontraron lugares. Intenta de nuevo.</div>
+                      ):(
                         <div style={{display:'flex',flexDirection:'column',gap:'.4rem'}}>
-                          {pois.map((poi,i)=>(
-                            <POICard key={i} poi={poi} selected={selPoi===poi} onSelect={selectPoi}/>
+                          {places.map((p,i)=>(
+                            <PlaceCard key={i} place={p} selected={selPlace?.name===p.name} onSelect={selectPlace}/>
                           ))}
                         </div>
-                      </Card>
-                    )}
+                      )}
+                    </Card>
 
-                    {(poiBusy||poiShown) && (
-                      <Card label={selPoi?`${poiIcon(selPoi)} ${poiName(selPoi)}`:'🏛️ Monumento'} highlight={poiDone}>
-                        {poiBusy ? (
-                          <div style={{display:'flex',alignItems:'center',gap:'.6rem',color:'rgba(245,239,224,.5)',fontFamily:'sans-serif',fontSize:'.75rem',padding:'.5rem 0'}}>
-                            <Spin/> Narrando historia...
-                          </div>
-                        ) : (
+                    {(placeBusy||placeShown)&&(
+                      <Card label={selPlace?`${selPlace.icon||'🏛️'} ${selPlace.name}`:'🏛️ Monumento'} highlight={placeDone}>
+                        {placeBusy?(
+                          <div style={{display:'flex',alignItems:'center',gap:'.6rem',color:'rgba(245,239,224,.5)',fontFamily:'sans-serif',fontSize:'.75rem',padding:'.5rem 0'}}><Spin/> Narrando historia...</div>
+                        ):(
                           <>
-                            <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',lineHeight:1.9,color:'rgba(245,239,224,.87)',fontWeight:300,marginBottom:poiDone?'1rem':0,animation:'wtfade .4s ease'}}>
-                              {poiShown}
-                              {!poiDone&&poiShown&&<span style={{display:'inline-block',width:2,height:'.9em',background:G,verticalAlign:'middle',marginLeft:2,animation:'wtblink .8s infinite'}}/>}
+                            <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',lineHeight:1.9,color:'rgba(245,239,224,.87)',fontWeight:300,marginBottom:placeDone?'1rem':0,animation:'wtfade .4s ease'}}>
+                              {placeShown}
+                              {!placeDone&&placeShown&&<span style={{display:'inline-block',width:2,height:'.9em',background:G,verticalAlign:'middle',marginLeft:2,animation:'wtblink .8s infinite'}}/>}
                             </div>
-                            {poiDone&&(
-                              <Player
-                                story={poiStory} ctx="poi"
-                                playing={playing} progress={progress} audioCtx={audioCtx} spd={spd}
-                                onToggle={()=>toggleAudio(poiStory,'poi')}
-                                onRestart={()=>{stopAudio();setProgress(0);setAudioSrc(p=>({...p,poi:null}));setTimeout(()=>toggleAudio(poiStory,'poi'),150)}}
-                                onSpeed={()=>handleSpeed(poiStory,'poi')}
+                            {placeDone&&(
+                              <Player ctx="place" playing={playing} progress={progress} audioCtx={audioCtx} spd={spd} audioLoading={audioLoading}
+                                onToggle={()=>toggleAudio(placeStory,'place')}
+                                onRestart={()=>{stopAudio();setProgress(0);setAudioUrls(p=>({...p,place:null}));setTimeout(()=>toggleAudio(placeStory,'place'),150)}}
+                                onSpeed={()=>{const o=[0.75,1.0,1.25,1.5];const next=o[(o.indexOf(spd)+1)%o.length];setSpd(next);if(playing&&EL_KEY&&audioRef.current)audioRef.current.playbackRate=next;else if(playing){stopAudio();setTimeout(()=>startBrowserTTS(placeStory,'place'),100)}}}
                               />
                             )}
                           </>
