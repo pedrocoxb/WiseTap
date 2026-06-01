@@ -228,7 +228,7 @@ function PlaceCard({place, onSelect, selected}) {
   )
 }
 
-function Player({ctx, playing, progress, audioCtx, spd, onToggle, onRestart, onSpeed}) {
+function Player({ctx, playing, progress, audioCtx, spd, onToggle, onRestart, onSpeed, audioLoading=false}) {
   const isActive = audioCtx===ctx
   return (
     <>
