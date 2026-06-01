@@ -299,6 +299,7 @@ export default function App() {
 
   const [err,          setErr]         = useState('')
   const [playing,      setPlaying]     = useState(false)
+  const [audioLoading, setAudioLoading] = useState(false)
   const [progress,     setProgress]    = useState(0)
   const [spd,          setSpd]         = useState(1.0)
   const [audioCtx,     setAudioCtx]    = useState(null)
@@ -509,14 +510,29 @@ export default function App() {
     const file = e.target.files?.[0]
     if (!file) return
     setScanResult(null); setScanStory(''); setScanShown(''); setScanErr('')
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const dataUrl = ev.target.result
+
+    // Compress image before sending — reduces from ~5MB to ~150KB
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      const MAX = 800
+      let w = img.width, h = img.height
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX }
+        else { w = Math.round(w * MAX / h); h = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, w, h)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75)
       const base64 = dataUrl.split(',')[1]
-      const mime = file.type
-      setScanImage(base64); setScanMime(mime); setScanPreview(dataUrl)
+      setScanImage(base64)
+      setScanMime('image/jpeg')
+      setScanPreview(dataUrl)
+      URL.revokeObjectURL(objectUrl)
     }
-    reader.readAsDataURL(file)
+    img.src = objectUrl
   }
 
   async function identifyAndNarrate() {
