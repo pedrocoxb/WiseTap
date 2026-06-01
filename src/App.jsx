@@ -310,6 +310,7 @@ export default function App() {
 
   // ── Typewriter ─────────────────────────────────────────
   function typewrite(text, key) {
+    if (!text || typeof text !== 'string') return
     if (typeTimers.current[key]) clearInterval(typeTimers.current[key])
     if (key==='place') setPlaceShown('')
     else if (key==='scan') setScanShown('')
@@ -353,6 +354,7 @@ export default function App() {
   }
 
   function startBrowserTTS(text, ctx) {
+    if (!text || typeof text !== 'string') return
     const synth = window.speechSynthesis
     const ttsTag = LANGS.find(l => l.value === lang)?.tts || 'es-ES'
     const voices = synth.getVoices()
@@ -404,6 +406,7 @@ export default function App() {
     setStories(p=>({...p,[tab]:'loading'})); setErr('')
     try {
       const text=await askGroq(PROMPTS[tab](place, lang), GROQ_KEY, lang)
+      if (!text) throw new Error('empty')
       setStories(p=>({...p,[tab]:text})); typewrite(text,tab)
     } catch { setStories(p=>({...p,[tab]:'error'})); setErr('Error al generar.') }
   }
@@ -506,11 +509,12 @@ export default function App() {
         setScanBusy(false); return
       }
       setScanResult(result)
-      const place = result.city ? `${result.name}, ${result.city}` : result.name
       const text = await askGroq(PROMPTS.monument(result.name, result.type || 'Lugar de interés', result.city || '', lang), GROQ_KEY, lang)
+      if (!text) throw new Error('Narración vacía')
       setScanStory(text); typewrite(text, 'scan')
     } catch (e) {
-      setScanErr('Error al analizar la imagen. Verifica tu conexión.')
+      console.error('Scan error:', e)
+      setScanErr('Error al analizar o narrar. Intenta de nuevo.')
     }
     setScanBusy(false)
   }
@@ -533,7 +537,7 @@ export default function App() {
         ::-webkit-scrollbar-thumb{background:rgba(200,150,62,.3);border-radius:2px}
       `}</style>
 
-      <div style={{fontFamily:'Georgia,serif',background:'#1a1208',minHeight:'100vh',color:'#f5efe0',padding:'1.2rem 1rem 2rem',display:'flex',flexDirection:'column',gap:'.9rem',maxWidth:500,margin:'0 auto'}}>
+      <div style={{fontFamily:'Georgia,serif',background:'#1a1208',minHeight:'100vh',color:'#f5efe0',padding:'1.2rem 1rem 2rem',display:'flex',flexDirection:'column',gap:'.9rem',maxWidth:500,margin:'0 auto'}} onError={e=>console.error('Render error:',e)}>
 
         {/* Header */}
         <div style={{textAlign:'center',paddingBottom:'1rem',borderBottom:'1px solid rgba(200,150,62,.2)'}}>
@@ -698,15 +702,26 @@ export default function App() {
               <p style={{fontFamily:'sans-serif',fontSize:'.73rem',color:'rgba(245,239,224,.6)',lineHeight:1.6,marginBottom:'.85rem'}}>
                 Saca una foto a cualquier monumento, iglesia, plaza o edificio y la IA lo identificará y narrará su historia.
               </p>
-              <label style={{display:'block',cursor:'pointer'}}>
-                <input type="file" accept="image/*" capture="environment"
-                  onChange={handleImageSelect}
-                  style={{display:'none'}}
-                />
-                <div style={{width:'100%',padding:'1rem',background:'rgba(200,150,62,.08)',border:'2px dashed rgba(200,150,62,.4)',borderRadius:10,textAlign:'center',color:GL,fontFamily:'sans-serif',fontSize:'.78rem',fontWeight:600}}>
-                  {scanPreview ? '📷 Cambiar foto' : '📷 Tomar foto o elegir imagen'}
-                </div>
-              </label>
+              <div style={{display:'flex',gap:'.5rem'}}>
+                <label style={{flex:1,cursor:'pointer'}}>
+                  <input type="file" accept="image/*" capture="environment"
+                    onChange={handleImageSelect}
+                    style={{display:'none'}}
+                  />
+                  <div style={{padding:'.8rem',background:'rgba(200,150,62,.08)',border:'2px dashed rgba(200,150,62,.4)',borderRadius:10,textAlign:'center',color:GL,fontFamily:'sans-serif',fontSize:'.72rem',fontWeight:600}}>
+                    📷 Sacar foto
+                  </div>
+                </label>
+                <label style={{flex:1,cursor:'pointer'}}>
+                  <input type="file" accept="image/*"
+                    onChange={handleImageSelect}
+                    style={{display:'none'}}
+                  />
+                  <div style={{padding:'.8rem',background:'rgba(200,150,62,.08)',border:'2px dashed rgba(200,150,62,.4)',borderRadius:10,textAlign:'center',color:GL,fontFamily:'sans-serif',fontSize:'.72rem',fontWeight:600}}>
+                    🖼️ Subir imagen
+                  </div>
+                </label>
+              </div>
               {scanPreview && (
                 <div style={{marginTop:'.75rem',borderRadius:10,overflow:'hidden',maxHeight:220,display:'flex',alignItems:'center',justifyContent:'center',background:'#000'}}>
                   <img src={scanPreview} style={{width:'100%',maxHeight:220,objectFit:'contain'}} alt="preview"/>
