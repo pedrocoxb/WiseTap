@@ -366,15 +366,23 @@ export default function App() {
     setPlaying(false)
   }
 
+  function getBestVoice(lang) {
+    const synth = window.speechSynthesis
+    const voices = synth.getVoices()
+    const ttsTag = LANGS.find(l => l.value === lang)?.tts || 'es-ES'
+    // Priority: Google voices > Microsoft voices > any matching voice
+    const googleVoice = voices.find(v => v.lang.startsWith(ttsTag.split('-')[0]) && v.name.includes('Google'))
+    const microsoftVoice = voices.find(v => v.lang.startsWith(ttsTag.split('-')[0]) && v.name.includes('Microsoft'))
+    const exactMatch = voices.find(v => v.lang === ttsTag)
+    const langMatch = voices.find(v => v.lang.startsWith(lang + '-'))
+    const anyMatch = voices.find(v => v.lang.startsWith(lang))
+    return googleVoice || microsoftVoice || exactMatch || langMatch || anyMatch || null
+  }
+
   function startBrowserTTS(text, ctx) {
     if (!text || typeof text !== 'string') return
     const synth = window.speechSynthesis
-    const ttsTag = LANGS.find(l => l.value === lang)?.tts || 'es-ES'
-    const voices = synth.getVoices()
-    const voice = voices.find(v => v.lang === ttsTag)
-               || voices.find(v => v.lang.startsWith(lang + '-'))
-               || voices.find(v => v.lang.startsWith(lang))
-               || null
+    const voice = getBestVoice(lang)
     const parts = text.match(/[^.!?]+[.!?]*/g) || [text]
     const totalSec = (text.split(/\s+/).length / 130) * 60 / spdRef.current
     const t0 = Date.now()
