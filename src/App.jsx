@@ -102,21 +102,27 @@ async function askGroqVision(imageBase64, mimeType, key) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({
-      model: 'llama-3.2-11b-vision-preview',
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image_url',
-            image_url: { url: `data:${mimeType};base64,${imageBase64}` }
-          },
-          {
-            type: 'text',
-            text: 'Identify what monument, building, landmark or place of interest appears in this image. Respond with ONLY a JSON object in this format, no extra text: {"name": "exact name of the place", "type": "type of place (monument/museum/church/etc)", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify a specific landmark, set name to null.'
-          }
-        ]
-      }],
-      max_tokens: 200,
+      model: 'llama-3.2-90b-vision-preview',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert in world architecture, monuments and landmarks. Your task is to identify specific places from photos. Always respond with valid JSON only, no markdown, no extra text.'
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'high' }
+            },
+            {
+              type: 'text',
+              text: 'Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible — include the exact name, not just a generic description. Respond with ONLY this JSON format: {"name": "exact specific name", "type": "monument/church/museum/palace/bridge/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you truly cannot identify it, set name to null.'
+            }
+          ]
+        }
+      ],
+      max_tokens: 300,
       temperature: 0.1,
     }),
   })
@@ -124,7 +130,8 @@ async function askGroqVision(imageBase64, mimeType, key) {
   const d = await r.json()
   const text = d.choices?.[0]?.message?.content || '{}'
   try {
-    const match = text.match(/\{[\s\S]*\}/)
+    const clean = text.replace(/```json|```/g, '').trim()
+    const match = clean.match(/\{[\s\S]*\}/)
     return match ? JSON.parse(match[0]) : null
   } catch { return null }
 }
