@@ -102,7 +102,7 @@ async function askGroqVision(imageBase64, mimeType, key) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      model: 'llama-3.2-11b-vision-preview',
       messages: [{
         role: 'user',
         content: [
@@ -312,11 +312,13 @@ export default function App() {
   function typewrite(text, key) {
     if (typeTimers.current[key]) clearInterval(typeTimers.current[key])
     if (key==='place') setPlaceShown('')
+    else if (key==='scan') setScanShown('')
     else setShown(p=>({...p,[key]:''}))
     const words=text.split(' '); let i=0
     typeTimers.current[key]=setInterval(()=>{
       i++; const chunk=words.slice(0,i).join(' ')
       if (key==='place') setPlaceShown(chunk)
+      else if (key==='scan') setScanShown(chunk)
       else setShown(p=>({...p,[key]:chunk}))
       if (i>=words.length) clearInterval(typeTimers.current[key])
     },22)
