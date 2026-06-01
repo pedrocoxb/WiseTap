@@ -98,42 +98,48 @@ async function askGroq(prompt, key, lang) {
 }
 
 async function askGroqVision(imageBase64, mimeType, key) {
-  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({
-      model: 'llama-3.2-90b-vision-preview',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert in world architecture, monuments and landmarks. Your task is to identify specific places from photos. Always respond with valid JSON only, no markdown, no extra text.'
-        },
-        {
-          role: 'user',
-          content: [
+  const VISION_MODELS = [
+    'llama-3.2-90b-vision-preview',
+    'llama-3.2-11b-vision-preview',
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+  ]
+  const systemPrompt = 'You are an expert in world architecture, monuments and landmarks. Identify specific places from photos. Always respond with valid JSON only, no markdown, no extra text.'
+  const userPrompt = 'Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible. Respond with ONLY this JSON: {"name": "exact specific name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify it, set name to null.'
+
+  for (const model of VISION_MODELS) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
             {
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'high' }
-            },
-            {
-              type: 'text',
-              text: 'Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible — include the exact name, not just a generic description. Respond with ONLY this JSON format: {"name": "exact specific name", "type": "monument/church/museum/palace/bridge/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you truly cannot identify it, set name to null.'
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+                { type: 'text', text: userPrompt }
+              ]
             }
-          ]
-        }
-      ],
-      max_tokens: 300,
-      temperature: 0.1,
-    }),
-  })
-  if (!r.ok) throw new Error('Groq Vision ' + r.status)
-  const d = await r.json()
-  const text = d.choices?.[0]?.message?.content || '{}'
-  try {
-    const clean = text.replace(/```json|```/g, '').trim()
-    const match = clean.match(/\{[\s\S]*\}/)
-    return match ? JSON.parse(match[0]) : null
-  } catch { return null }
+          ],
+          max_tokens: 300,
+          temperature: 0.1,
+        }),
+      })
+      if (!r.ok) continue
+      const d = await r.json()
+      const text = d.choices?.[0]?.message?.content || ''
+      if (!text) continue
+      const clean = text.replace(/```json|```/g, '').trim()
+      const match = clean.match(/\{[\s\S]*\}/)
+      if (match) {
+        const result = JSON.parse(match[0])
+        if (result && result.name) return result
+      }
+    } catch { continue }
+  }
+  return null
 }
 
 async function getFamousPlaces(city, key, lang) {
