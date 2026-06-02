@@ -14,11 +14,11 @@ const LANGS = [
   { value:'pt', label:'🎶 Português', tts:'pt-BR' },
 ]
 const SYS_LANG = {
-  es: "Eres un guia turistico experto. REGLAS ESTRICTAS: 1) Responde SIEMPRE en español, sin excepciones. 2) Nunca uses palabras en ingles ni en otro idioma. Si algo se llama city di ciudad, si se llama tour di recorrido. 3) Sin metaforas, sin frases poeticas. 4) Solo datos concretos, fechas, nombres y hechos reales. 5) Tono claro, directo y ameno.",
-  en: "You are an expert tour guide. STRICT RULES: 1) Always respond in English, no exceptions. 2) Never use words in other languages. 3) No metaphors, no poetic language. 4) Only concrete facts, dates, names and real events. 5) Clear, direct and engaging tone.",
-  fr: "Tu es un guide touristique expert. REGLES STRICTES: 1) Reponds TOUJOURS en francais, sans exception. 2) Pas de mots dans d'autres langues. 3) Pas de metaphores ni de langage poetique. 4) Uniquement des faits concrets et dates reelles. 5) Ton clair et direct.",
-  it: "Sei una guida turistica esperta. REGOLE STRETTE: 1) Rispondi SEMPRE in italiano, senza eccezioni. 2) Niente parole in altre lingue. 3) Niente metafore o linguaggio poetico. 4) Solo fatti concreti, date e eventi reali. 5) Tono chiaro e diretto.",
-  pt: "Voce e um guia turistico especialista. REGRAS ESTRITAS: 1) Responda SEMPRE em portugues, sem excecoes. 2) Nunca use palavras em outros idiomas. 3) Sem metaforas ou linguagem poetica. 4) Apenas fatos concretos, datas e eventos reais. 5) Tom claro e direto.",
+  es: "Eres un guia turistico experto y riguroso. REGLAS ABSOLUTAS: 1) Responde SIEMPRE en español, sin excepciones, sin palabras en otros idiomas. 2) Sin metaforas ni frases poeticas. 3) NUNCA inventes datos, fechas, nombres ni hechos. Si no tienes certeza de un dato, NO lo incluyas. 4) Si el texto de Wikipedia esta disponible, usalo como unica fuente de verdad. 5) Si no conoces un dato con certeza, di 'se desconoce la fecha exacta' o simplemente omitelo. 6) Tono claro, directo y ameno.",
+  en: "You are a rigorous expert tour guide. ABSOLUTE RULES: 1) Always respond in English, no exceptions. 2) No metaphors, no poetic language. 3) NEVER invent data, dates, names or facts. If unsure about a fact, do NOT include it. 4) If Wikipedia text is available, use it as the only source of truth. 5) If you do not know a date with certainty, say 'the exact date is unknown' or omit it. 6) Clear, direct and engaging tone.",
+  fr: "Tu es un guide touristique expert et rigoureux. REGLES ABSOLUES: 1) Reponds TOUJOURS en francais, sans exception, sans mots dans d'autres langues. 2) Pas de metaphores. 3) N'invente JAMAIS de donnees, dates ou faits. Si tu n'es pas certain, ne l'inclus pas. 4) Si le texte Wikipedia est disponible, utilise-le comme seule source. 5) Ton clair et direct.",
+  it: "Sei una guida turistica esperta e rigorosa. REGOLE ASSOLUTE: 1) Rispondi SEMPRE in italiano, senza eccezioni. 2) Niente metafore. 3) Non inventare MAI dati, date o fatti. Se non sei sicuro, non includerlo. 4) Se il testo Wikipedia e disponibile, usalo come unica fonte. 5) Tono chiaro e diretto.",
+  pt: "Voce e um guia turistico especialista e rigoroso. REGRAS ABSOLUTAS: 1) Responda SEMPRE em portugues, sem excecoes. 2) Sem metaforas. 3) NUNCA invente dados, datas ou fatos. Se nao tiver certeza, nao inclua. 4) Se o texto da Wikipedia estiver disponivel, use-o como unica fonte. 5) Tom claro e direto.",
 }
 
 const LANG_NAMES = { es:'español', en:'English', fr:'français', it:'italiano', pt:'português' }
@@ -34,7 +34,7 @@ Narra la historia de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'espa
 - Los personajes históricos relevantes ligados al lugar
 - Cómo evolucionó con el tiempo hasta hoy
 - Su importancia actual
-REGLAS CRÍTICAS: ${wikiContext ? 'Basa el relato en la información de Wikipedia proporcionada. NO inventes datos ni fechas.' : 'Solo incluye datos que conozcas con certeza.'} TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con el primer dato histórico.`
+REGLAS CRITICAS: ${wikiContext ? 'USA EXCLUSIVAMENTE la informacion de Wikipedia proporcionada. PROHIBIDO agregar datos, fechas o hechos que no aparezcan en ese texto.' : 'SOLO incluye datos que conozcas con total certeza. NUNCA rellenes con suposiciones o datos aproximados.'} TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con el primer dato historico.`
   },
 
   legends: (place, lang) =>
@@ -200,6 +200,94 @@ async function fetchWikipedia(name, lang) {
     }
     return null
   } catch { return null }
+}
+
+
+// ─── Wikidata API ─────────────────────────────────────────
+async function fetchWikidata(name) {
+  try {
+    // Search for the entity
+    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(name)}&language=en&limit=1&format=json&origin=*`
+    const sr = await fetch(searchUrl)
+    if (!sr.ok) return null
+    const sd = await sr.json()
+    const entityId = sd.search?.[0]?.id
+    if (!entityId) return null
+
+    // Get entity data
+    const entityUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${entityId}&props=claims|labels|descriptions&languages=en|es&format=json&origin=*`
+    const er = await fetch(entityUrl)
+    if (!er.ok) return null
+    const ed = await er.json()
+    const entity = ed.entities?.[entityId]
+    if (!entity) return null
+
+    const claims = entity.claims || {}
+    const facts = []
+
+    // Inception date (P571)
+    const inception = claims.P571?.[0]?.mainsnak?.datavalue?.value?.time
+    if (inception) {
+      const year = inception.match(/[+-](\d{4})/)?.[1]
+      if (year) facts.push(`Año de construcción/fundación: ${year}`)
+    }
+
+    // Architect (P84)
+    const architects = claims.P84 || []
+    for (const a of architects.slice(0, 3)) {
+      const archId = a.mainsnak?.datavalue?.value?.id
+      if (archId) {
+        try {
+          const ar = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${archId}&props=labels&languages=en|es&format=json&origin=*`)
+          const ad = await ar.json()
+          const archName = ad.entities?.[archId]?.labels?.es?.value || ad.entities?.[archId]?.labels?.en?.value
+          if (archName) facts.push(`Arquitecto: ${archName}`)
+        } catch {}
+      }
+    }
+
+    // Country (P17)
+    const countryId = claims.P17?.[0]?.mainsnak?.datavalue?.value?.id
+    if (countryId) {
+      try {
+        const cr = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${countryId}&props=labels&languages=en|es&format=json&origin=*`)
+        const cd = await cr.json()
+        const countryName = cd.entities?.[countryId]?.labels?.es?.value || cd.entities?.[countryId]?.labels?.en?.value
+        if (countryName) facts.push(`País: ${countryName}`)
+      } catch {}
+    }
+
+    // Height (P2048)
+    const height = claims.P2048?.[0]?.mainsnak?.datavalue?.value
+    if (height) facts.push(`Altura: ${height.amount} ${height.unit?.includes('metre') ? 'metros' : ''}`.trim())
+
+    // Heritage designation (P1435)
+    const heritage = claims.P1435?.[0]?.mainsnak?.datavalue?.value?.id
+    if (heritage) facts.push('Patrimonio protegido o declarado')
+
+    // Description
+    const desc = entity.descriptions?.es?.value || entity.descriptions?.en?.value
+    if (desc) facts.push(`Descripción: ${desc}`)
+
+    return facts.length > 0 ? facts.join('. ') : null
+  } catch { return null }
+}
+
+// ─── Combined context from Wikipedia + Wikidata ───────────
+async function fetchContext(name, lang) {
+  const [wiki, wikidata] = await Promise.allSettled([
+    fetchWikipedia(name, lang),
+    fetchWikidata(name),
+  ])
+  const wikiText = wiki.status === 'fulfilled' ? wiki.value : null
+  const wikidataText = wikidata.status === 'fulfilled' ? wikidata.value : null
+
+  if (!wikiText && !wikidataText) return null
+
+  let context = ''
+  if (wikidataText) context += `DATOS VERIFICADOS (Wikidata):\n${wikidataText}\n\n`
+  if (wikiText) context += `DESCRIPCIÓN (Wikipedia):\n${wikiText}`
+  return context.trim() || null
 }
 
 // ─── Geo helpers ──────────────────────────────────────────
@@ -584,7 +672,7 @@ export default function App() {
       }
       setScanResult(result)
       // Fetch Wikipedia for accurate data
-      const wikiContext = await fetchWikipedia(result.name, lang)
+      const wikiContext = await fetchContext(result.name, lang)
       const text = await askGroq(PROMPTS.monument(result.name, result.type || 'Lugar de interés', result.city || '', lang, wikiContext), GROQ_KEY, lang)
       if (!text) throw new Error('Narración vacía')
       setScanStory(text); typewrite(text, 'scan')
