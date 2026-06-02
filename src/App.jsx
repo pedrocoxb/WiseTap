@@ -23,15 +23,19 @@ const SYS_LANG = {
 
 const LANG_NAMES = { es:'español', en:'English', fr:'français', it:'italiano', pt:'português' }
 const PROMPTS = {
-  history: (place, lang) =>
-    `Lugar: ${place}.
+  history: (place, lang, wikiContext) => {
+    const wikiSection = wikiContext
+      ? `\n\nINFORMACIÓN VERIFICADA DE WIKIPEDIA (úsala como base principal):\n${wikiContext}\n`
+      : ''
+    return `Lugar: ${place}.${wikiSection}
 Narra la historia de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
 - Cuándo fue fundado, por quién y en qué contexto histórico
 - Los hechos y eventos históricos más importantes, con fechas concretas
 - Los personajes históricos relevantes ligados al lugar
 - Cómo evolucionó con el tiempo hasta hoy
 - Su importancia actual
-IMPORTANTE: Sin introducción genérica. Empieza directamente con el primer dato histórico. TODO el texto en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
+REGLAS CRÍTICAS: ${wikiContext ? 'Basa el relato en la información de Wikipedia proporcionada. NO inventes datos ni fechas.' : 'Solo incluye datos que conozcas con certeza.'} TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con el primer dato histórico.`
+  },
 
   legends: (place, lang) =>
     `Lugar: ${place}.
@@ -52,15 +56,19 @@ Describe la gastronomía típica de este lugar en 350-400 palabras en ${LANG_NAM
 - Una curiosidad gastronómica del lugar
 IMPORTANTE: Información práctica y concreta. Sin metáforas sobre sabores. Empieza directamente con el primer plato. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
 
-  monument: (place, type, city, lang) =>
-    `Lugar: ${place}. Tipo: ${type}. Ciudad: ${city}.
+  monument: (place, type, city, lang, wikiContext) => {
+    const wikiSection = wikiContext
+      ? `\n\nINFORMACIÓN VERIFICADA DE WIKIPEDIA (úsala como base principal):\n${wikiContext}\n`
+      : ''
+    return `Lugar: ${place}. Tipo: ${type}. Ciudad: ${city}.${wikiSection}
 Narra la historia completa en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
 - Cuándo fue construido o creado, por quién y con qué propósito
-- Los eventos o personajes históricos más importantes ligados a él, con fechas
+- Los eventos o personajes históricos más importantes ligados a él, con fechas exactas
 - Sus características arquitectónicas, artísticas o culturales más destacadas
 - Cómo ha cambiado o sido restaurado con el tiempo
-- Por qué es importante visitarlo hoy y qué puede ver el turista
-IMPORTANTE: Empieza directamente con los datos del lugar. Sin introducción genérica. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
+- Por qué es importante visitarlo hoy
+REGLAS CRÍTICAS: ${wikiContext ? 'Basa el relato en la información de Wikipedia proporcionada. NO inventes datos ni fechas que no estén en ese texto.' : 'Solo incluye datos que conozcas con certeza. Si no sabes una fecha exacta, no la menciones.'} TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con los datos.`
+  },
 
   famous: (city, lang) => {
     const instrucciones = {
@@ -164,6 +172,35 @@ async function getFamousPlaces(city, key, lang) {
   } catch { return [] }
 }
 
+
+
+// ─── Wikipedia API ────────────────────────────────────────
+async function fetchWikipedia(name, lang) {
+  try {
+    const langMap = { es:'es', en:'en', fr:'fr', it:'it', pt:'pt' }
+    const wikiLang = langMap[lang] || 'es'
+
+    // Search for the article
+    const searchUrl = `https://${wikiLang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
+    const r = await fetch(searchUrl)
+    if (r.ok) {
+      const d = await r.json()
+      if (d.extract && d.extract.length > 100) {
+        return d.extract.slice(0, 2000) // max 2000 chars
+      }
+    }
+
+    // Fallback: try English Wikipedia
+    const rEn = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`)
+    if (rEn.ok) {
+      const dEn = await rEn.json()
+      if (dEn.extract && dEn.extract.length > 100) {
+        return dEn.extract.slice(0, 2000)
+      }
+    }
+    return null
+  } catch { return null }
+}
 
 // ─── Geo helpers ──────────────────────────────────────────
 async function reverseGeocode(lat, lon) {
@@ -546,7 +583,9 @@ export default function App() {
         setScanBusy(false); return
       }
       setScanResult(result)
-      const text = await askGroq(PROMPTS.monument(result.name, result.type || 'Lugar de interés', result.city || '', lang), GROQ_KEY, lang)
+      // Fetch Wikipedia for accurate data
+      const wikiContext = await fetchWikipedia(result.name, lang)
+      const text = await askGroq(PROMPTS.monument(result.name, result.type || 'Lugar de interés', result.city || '', lang, wikiContext), GROQ_KEY, lang)
       if (!text) throw new Error('Narración vacía')
       setScanStory(text); typewrite(text, 'scan')
     } catch (e) {
