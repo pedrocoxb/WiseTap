@@ -14,27 +14,39 @@ const LANGS = [
   { value:'pt', label:'🎶 Português', tts:'pt-BR' },
 ]
 const SYS_LANG = {
-  es: "Eres un guia turistico experto y riguroso. REGLAS ABSOLUTAS: 1) Responde SIEMPRE en español, sin excepciones, sin palabras en otros idiomas. 2) Sin metaforas ni frases poeticas. 3) NUNCA inventes datos, fechas, nombres ni hechos. Si no tienes certeza de un dato, NO lo incluyas. 4) Si el texto de Wikipedia esta disponible, usalo como unica fuente de verdad. 5) Si no conoces un dato con certeza, di 'se desconoce la fecha exacta' o simplemente omitelo. 6) Tono claro, directo y ameno.",
-  en: "You are a rigorous expert tour guide. ABSOLUTE RULES: 1) Always respond in English, no exceptions. 2) No metaphors, no poetic language. 3) NEVER invent data, dates, names or facts. If unsure about a fact, do NOT include it. 4) If Wikipedia text is available, use it as the only source of truth. 5) If you do not know a date with certainty, say 'the exact date is unknown' or omit it. 6) Clear, direct and engaging tone.",
-  fr: "Tu es un guide touristique expert et rigoureux. REGLES ABSOLUES: 1) Reponds TOUJOURS en francais, sans exception, sans mots dans d'autres langues. 2) Pas de metaphores. 3) N'invente JAMAIS de donnees, dates ou faits. Si tu n'es pas certain, ne l'inclus pas. 4) Si le texte Wikipedia est disponible, utilise-le comme seule source. 5) Ton clair et direct.",
-  it: "Sei una guida turistica esperta e rigorosa. REGOLE ASSOLUTE: 1) Rispondi SEMPRE in italiano, senza eccezioni. 2) Niente metafore. 3) Non inventare MAI dati, date o fatti. Se non sei sicuro, non includerlo. 4) Se il testo Wikipedia e disponibile, usalo come unica fonte. 5) Tono chiaro e diretto.",
-  pt: "Voce e um guia turistico especialista e rigoroso. REGRAS ABSOLUTAS: 1) Responda SEMPRE em portugues, sem excecoes. 2) Sem metaforas. 3) NUNCA invente dados, datas ou fatos. Se nao tiver certeza, nao inclua. 4) Se o texto da Wikipedia estiver disponivel, use-o como unica fonte. 5) Tom claro e direto.",
+  es: "Eres un guia turistico experto y riguroso. REGLAS ABSOLUTAS: 1) Responde SIEMPRE en español, sin excepciones, sin palabras en otros idiomas. 2) Sin metaforas ni frases poeticas. 3) NUNCA inventes datos, fechas, nombres ni hechos. 4) Si no tienes certeza de un dato, OMITELO en silencio, NUNCA digas que no sabes o que se desconoce. 5) Si el texto de Wikipedia o Wikidata esta disponible, usalo como unica fuente de verdad y extrae todas las fechas y datos concretos que puedas. 6) Tono claro, directo y ameno. 7) NUNCA uses frases como 'se desconoce', 'no se sabe', 'la fecha exacta es incierta' — simplemente omite ese dato y continua.",
+  en: "You are a rigorous expert tour guide. ABSOLUTE RULES: 1) Always respond in English, no exceptions. 2) No metaphors, no poetic language. 3) NEVER invent data, dates, names or facts. 4) If unsure about a fact, omit it silently — NEVER say you don't know or that it's unknown. 5) If Wikipedia or Wikidata text is available, use it as the only source of truth. 6) NEVER use phrases like 'the exact date is unknown' or 'it is uncertain' — just skip that detail. 7) Clear, direct and engaging tone.",
+  fr: "Tu es un guide touristique expert et rigoureux. REGLES ABSOLUES: 1) Reponds TOUJOURS en francais, sans exception. 2) Pas de metaphores. 3) N'invente JAMAIS de donnees ou faits. 4) Si tu n'es pas certain d'un fait, omets-le en silence, ne dis jamais que tu ne sais pas. 5) Utilise Wikipedia et Wikidata comme seule source. 6) Ton clair et direct.",
+  it: "Sei una guida turistica esperta e rigorosa. REGOLE ASSOLUTE: 1) Rispondi SEMPRE in italiano, senza eccezioni. 2) Niente metafore. 3) Non inventare MAI dati o fatti. 4) Se non sei sicuro di un dato, omettilo in silenzio, non dire mai che non lo sai. 5) Usa Wikipedia e Wikidata come unica fonte. 6) Tono chiaro e diretto.",
+  pt: "Voce e um guia turistico especialista e rigoroso. REGRAS ABSOLUTAS: 1) Responda SEMPRE em portugues, sem excecoes. 2) Sem metaforas. 3) NUNCA invente dados ou fatos. 4) Se nao tiver certeza de um dado, omita-o em silencio, nunca diga que nao sabe. 5) Use Wikipedia e Wikidata como unica fonte. 6) Tom claro e direto.",
 }
 
 const LANG_NAMES = { es:'español', en:'English', fr:'français', it:'italiano', pt:'português' }
 const PROMPTS = {
   history: (place, lang, wikiContext) => {
-    const wikiSection = wikiContext
-      ? `\n\nINFORMACIÓN VERIFICADA DE WIKIPEDIA (úsala como base principal):\n${wikiContext}\n`
-      : ''
-    return `Lugar: ${place}.${wikiSection}
-Narra la historia de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
-- Cuándo fue fundado, por quién y en qué contexto histórico
-- Los hechos y eventos históricos más importantes, con fechas concretas
-- Los personajes históricos relevantes ligados al lugar
-- Cómo evolucionó con el tiempo hasta hoy
-- Su importancia actual
-REGLAS CRITICAS: ${wikiContext ? 'USA EXCLUSIVAMENTE la informacion de Wikipedia proporcionada. PROHIBIDO agregar datos, fechas o hechos que no aparezcan en ese texto.' : 'SOLO incluye datos que conozcas con total certeza. NUNCA rellenes con suposiciones o datos aproximados.'} TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con el primer dato historico.`
+    if (wikiContext) {
+      return `Tienes la siguiente informacion verificada sobre ${place}:
+
+--- FUENTE VERIFICADA ---
+${wikiContext}
+--- FIN FUENTE ---
+
+Tu tarea: escribe una narracion de audioguia de 350-400 palabras en ${LANG_NAMES[lang]||'español'} basandote UNICAMENTE en el texto anterior.
+INSTRUCCIONES:
+1. Extrae y menciona TODAS las fechas concretas que aparezcan (fundacion, eventos importantes, etc.)
+2. Menciona TODOS los personajes y nombres importantes que aparezcan
+3. Explica los eventos historicos mas relevantes mencionados en la fuente
+4. Describe como ha evolucionado el lugar hasta hoy
+5. NO agregues ningun dato que no este en el texto de la fuente
+6. NO uses frases como "se desconoce" — simplemente omite lo que no este en la fuente
+7. Tono directo y claro, sin frases poeticas
+8. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas
+Empieza directamente con el nombre del lugar y su contexto historico.`
+    }
+    return `Lugar: ${place}.
+Narra la historia en 350-400 palabras en ${LANG_NAMES[lang]||'español'}.
+REGLAS: Solo incluye datos que conozcas con certeza absoluta. Omite en silencio lo que no sepas. Sin frases poeticas. Todo en ${LANG_NAMES[lang]||'español'}.
+Empieza directamente con el primer dato historico.`
   },
 
   legends: (place, lang) =>
@@ -83,7 +95,8 @@ REGLAS CRÍTICAS: ${wikiContext ? 'Basa el relato en la información de Wikipedi
 }
 
 const G='#c8963e', GL='#e8b96a', T='#b05c3a'
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
+const GROQ_KEY   = import.meta.env.VITE_GROQ_API_KEY   || ''
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 
 
 // ─── API helpers ──────────────────────────────────────────
@@ -103,6 +116,42 @@ async function askGroq(prompt, key, lang) {
   if (!r.ok) throw new Error('Groq ' + r.status)
   const d = await r.json()
   return d.choices?.[0]?.message?.content || ''
+}
+
+
+// ─── Gemini Vision (better landmark recognition) ──────────
+async function askGeminiVision(imageBase64, mimeType, key) {
+  try {
+    const prompt = 'Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible — use the exact official name. Respond with ONLY this JSON, no markdown, no extra text: {"name": "exact official name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify a specific landmark, set name to null.'
+
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+              { text: prompt }
+            ]
+          }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 300 }
+        })
+      }
+    )
+    if (!r.ok) return null
+    const d = await r.json()
+    const text = d.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    if (!text) return null
+    const clean = text.replace(/```json|```/g, '').trim()
+    const match = clean.match(/\{[\s\S]*\}/)
+    if (match) {
+      const result = JSON.parse(match[0])
+      if (result?.name) return result
+    }
+    return null
+  } catch { return null }
 }
 
 async function askGroqVision(imageBase64, mimeType, key) {
@@ -665,7 +714,14 @@ export default function App() {
     setScanBusy(true); setScanResult(null); setScanStory(''); setScanShown(''); setScanErr('')
     stopAllAudio()
     try {
-      const result = await askGroqVision(scanImage, scanMime, GROQ_KEY)
+      // Try Gemini Vision first (better for landmarks), fall back to Groq
+      let result = null
+      if (GEMINI_KEY) {
+        result = await askGeminiVision(scanImage, scanMime, GEMINI_KEY)
+      }
+      if (!result || !result.name) {
+        result = await askGroqVision(scanImage, scanMime, GROQ_KEY)
+      }
       if (!result || !result.name) {
         setScanErr('No se pudo identificar ningún monumento o lugar en la foto. Intenta con otra imagen más clara.')
         setScanBusy(false); return
