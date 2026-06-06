@@ -229,24 +229,42 @@ async function fetchWikipedia(name, lang) {
     const langMap = { es:'es', en:'en', fr:'fr', it:'it', pt:'pt' }
     const wikiLang = langMap[lang] || 'es'
 
-    // Search for the article
-    const searchUrl = `https://${wikiLang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
-    const r = await fetch(searchUrl)
-    if (r.ok) {
-      const d = await r.json()
-      if (d.extract && d.extract.length > 100) {
-        return d.extract.slice(0, 2000) // max 2000 chars
-      }
+    // Try full article sections first for more data including dates
+    async function getFullText(language, title) {
+      try {
+        const url = `https://${language}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=0&explaintext=1&exsectionformat=plain&exchars=4000&format=json&origin=*`
+        const r = await fetch(url)
+        if (!r.ok) return null
+        const d = await r.json()
+        const pages = d.query?.pages
+        const page = pages ? Object.values(pages)[0] : null
+        if (page && page.extract && page.extract.length > 100) return page.extract.slice(0, 4000)
+      } catch {}
+      return null
     }
 
-    // Fallback: try English Wikipedia
+    // Try in user's language first
+    let text = await getFullText(wikiLang, name)
+    if (text) return text
+
+    // Fallback to summary API
+    const r = await fetch(`https://${wikiLang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`)
+    if (r.ok) {
+      const d = await r.json()
+      if (d.extract && d.extract.length > 100) return d.extract.slice(0, 4000)
+    }
+
+    // Fallback to English full article
+    let enText = await getFullText('en', name)
+    if (enText) return enText
+
+    // Fallback to English summary
     const rEn = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`)
     if (rEn.ok) {
       const dEn = await rEn.json()
-      if (dEn.extract && dEn.extract.length > 100) {
-        return dEn.extract.slice(0, 2000)
-      }
+      if (dEn.extract && dEn.extract.length > 100) return dEn.extract.slice(0, 4000)
     }
+
     return null
   } catch { return null }
 }
