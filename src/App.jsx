@@ -120,9 +120,12 @@ async function askGroq(prompt, key, lang) {
 
 
 // ─── Gemini Vision (better landmark recognition) ──────────
-async function askGeminiVision(imageBase64, mimeType, key) {
+async function askGeminiVision(imageBase64, mimeType, key, location) {
   try {
-    const prompt = 'Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible — use the exact official name. Respond with ONLY this JSON, no markdown, no extra text: {"name": "exact official name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify a specific landmark, set name to null.'
+    const locationHint = location
+      ? `IMPORTANT CONTEXT: The photo was taken in ${[location.city, location.country].filter(Boolean).join(', ')}. Use this to help identify the exact landmark — do not confuse it with similar places in other countries.`
+      : ''
+    const prompt = `Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible — use the exact official name. ${locationHint} Respond with ONLY this JSON, no markdown, no extra text: {"name": "exact official name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify a specific landmark, set name to null.`
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
@@ -154,14 +157,17 @@ async function askGeminiVision(imageBase64, mimeType, key) {
   } catch { return null }
 }
 
-async function askGroqVision(imageBase64, mimeType, key) {
+async function askGroqVision(imageBase64, mimeType, key, location) {
   const VISION_MODELS = [
     'llama-3.2-90b-vision-preview',
     'llama-3.2-11b-vision-preview',
     'meta-llama/llama-4-scout-17b-16e-instruct',
   ]
+  const locationHint = location
+    ? `IMPORTANT CONTEXT: The photo was taken in ${[location.city, location.country].filter(Boolean).join(', ')}. Use this to identify the exact landmark — do not confuse it with similar places in other countries.`
+    : ''
   const systemPrompt = 'You are an expert in world architecture, monuments and landmarks. Identify specific places from photos. Always respond with valid JSON only, no markdown, no extra text.'
-  const userPrompt = 'Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible. Respond with ONLY this JSON: {"name": "exact specific name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify it, set name to null.'
+  const userPrompt = `Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible. ${locationHint} Respond with ONLY this JSON: {"name": "exact specific name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify it, set name to null.`
 
   for (const model of VISION_MODELS) {
     try {
@@ -326,7 +332,10 @@ async function fetchWikidata(name) {
 
     // Height (P2048)
     const height = claims.P2048?.[0]?.mainsnak?.datavalue?.value
-    if (height) facts.push(`Altura: ${height.amount} ${height.unit?.includes('metre') ? 'metros' : ''}`.trim())
+    if (height && height.amount) {
+      const meters = Math.round(Math.abs(parseFloat(height.amount)))
+      if (meters > 0) facts.push(`Altura: ${meters} metros`)
+    }
 
     // Heritage designation (P1435)
     const heritage = claims.P1435?.[0]?.mainsnak?.datavalue?.value?.id
@@ -480,6 +489,7 @@ export default function App() {
   const [placeShown,  setPlaceShown]  = useState('')
   const [placeBusy,   setPlaceBusy]   = useState(false)
 
+  const [scanLocation, setScanLocation] = useState(null)  // {city, country} from GPS
   const [scanImage,    setScanImage]    = useState(null)  // base64
   const [scanMime,     setScanMime]     = useState('')
   const [scanPreview,  setScanPreview]  = useState(null)  // object URL
@@ -698,10 +708,30 @@ export default function App() {
   }
 
   // ── Scan image ────────────────────────────────────────
+  function getScanLocation() {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const { latitude: lat, longitude: lon } = pos.coords
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        )
+        const d = await r.json()
+        const a = d.address || {}
+        const city = a.city || a.town || a.village || a.municipality || a.county || null
+        const country = a.country || null
+        if (city || country) setScanLocation({ city, country })
+      } catch {}
+    }, () => {}, { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 })
+  }
+
   function handleImageSelect(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setScanResult(null); setScanStory(''); setScanShown(''); setScanErr('')
+    // Get GPS location in background for better identification
+    getScanLocation()
 
     // Compress image before sending — reduces from ~5MB to ~150KB
     const img = new Image()
@@ -735,10 +765,10 @@ export default function App() {
       // Try Gemini Vision first (better for landmarks), fall back to Groq
       let result = null
       if (GEMINI_KEY) {
-        result = await askGeminiVision(scanImage, scanMime, GEMINI_KEY)
+        result = await askGeminiVision(scanImage, scanMime, GEMINI_KEY, scanLocation)
       }
       if (!result || !result.name) {
-        result = await askGroqVision(scanImage, scanMime, GROQ_KEY)
+        result = await askGroqVision(scanImage, scanMime, GROQ_KEY, scanLocation)
       }
       if (!result || !result.name) {
         setScanErr('No se pudo identificar ningún monumento o lugar en la foto. Intenta con otra imagen más clara.')
