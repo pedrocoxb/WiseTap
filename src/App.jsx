@@ -122,9 +122,15 @@ async function askGroq(prompt, key, lang) {
 // ─── Gemini Vision (better landmark recognition) ──────────
 async function askGeminiVision(imageBase64, mimeType, key, location) {
   try {
-    const locationHint = location
-      ? `IMPORTANT CONTEXT: The photo was taken in ${[location.city, location.country].filter(Boolean).join(', ')}. Use this to help identify the exact landmark — do not confuse it with similar places in other countries.`
-      : ''
+    const locationHint = location ? (() => {
+      const parts = []
+      if (location.road) parts.push(location.road)
+      if (location.neighbourhood) parts.push(location.neighbourhood)
+      if (location.city) parts.push(location.city)
+      if (location.country) parts.push(location.country)
+      if (location.coords) parts.push(`GPS: ${location.coords}`)
+      return `IMPORTANT CONTEXT: The photo was taken at this exact location: ${parts.join(', ')}. Use this precise location to identify the exact landmark in the photo — cross-reference the street address with known monuments in that area.`
+    })() : ''
     const prompt = `Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible — use the exact official name. ${locationHint} Respond with ONLY this JSON, no markdown, no extra text: {"name": "exact official name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify a specific landmark, set name to null.`
 
     const r = await fetch(
@@ -163,9 +169,15 @@ async function askGroqVision(imageBase64, mimeType, key, location) {
     'llama-3.2-11b-vision-preview',
     'meta-llama/llama-4-scout-17b-16e-instruct',
   ]
-  const locationHint = location
-    ? `IMPORTANT CONTEXT: The photo was taken in ${[location.city, location.country].filter(Boolean).join(', ')}. Use this to identify the exact landmark — do not confuse it with similar places in other countries.`
-    : ''
+  const locationHint = location ? (() => {
+    const parts = []
+    if (location.road) parts.push(location.road)
+    if (location.neighbourhood) parts.push(location.neighbourhood)
+    if (location.city) parts.push(location.city)
+    if (location.country) parts.push(location.country)
+    if (location.coords) parts.push(`GPS: ${location.coords}`)
+    return `IMPORTANT CONTEXT: The photo was taken at this exact location: ${parts.join(', ')}. Use this precise location to identify the exact landmark — cross-reference the street address with known monuments in that area.`
+  })() : ''
   const systemPrompt = 'You are an expert in world architecture, monuments and landmarks. Identify specific places from photos. Always respond with valid JSON only, no markdown, no extra text.'
   const userPrompt = `Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible. ${locationHint} Respond with ONLY this JSON: {"name": "exact specific name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify it, set name to null.`
 
@@ -719,11 +731,14 @@ export default function App() {
         )
         const d = await r.json()
         const a = d.address || {}
-        const city = a.city || a.town || a.village || a.municipality || a.county || null
-        const country = a.country || null
-        if (city || country) setScanLocation({ city, country })
+        const road        = a.road || a.pedestrian || a.footway || null
+        const neighbourhood = a.suburb || a.neighbourhood || a.quarter || null
+        const city        = a.city || a.town || a.village || a.municipality || a.county || null
+        const country     = a.country || null
+        const coords      = `${lat.toFixed(5)},${lon.toFixed(5)}`
+        setScanLocation({ road, neighbourhood, city, country, coords, lat, lon })
       } catch {}
-    }, () => {}, { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 })
+    }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
   }
 
   function handleImageSelect(e) {
