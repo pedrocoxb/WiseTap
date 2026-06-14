@@ -524,6 +524,8 @@ export default function App() {
 
   const [scanLocation, setScanLocation] = useState(null)  // {city, country} from GPS
   const [scanLoadingLoc, setScanLoadingLoc] = useState(false)
+  const [scanIsCamera, setScanIsCamera] = useState(true)
+  const [scanManualPlace, setScanManualPlace] = useState('')
   const scanLocationRef = useRef(null)
   const [scanImage,    setScanImage]    = useState(null)  // base64
   const [scanMime,     setScanMime]     = useState('')
@@ -770,13 +772,21 @@ export default function App() {
     })
   }
 
-  function handleImageSelect(e) {
+  function handleImageSelect(e, isCamera) {
     const file = e.target.files?.[0]
     if (!file) return
     setScanResult(null); setScanStory(''); setScanShown(''); setScanErr('')
-    setScanLocation(null); scanLocationRef.current = null; setScanLoadingLoc(true)
-    // Get GPS location in background for better identification
-    getScanLocation().finally(() => setScanLoadingLoc(false))
+    setScanIsCamera(isCamera); setScanManualPlace('')
+    setScanLocation(null); scanLocationRef.current = null
+
+    if (isCamera) {
+      // Camera photo — use live GPS location for better identification
+      setScanLoadingLoc(true)
+      getScanLocation().finally(() => setScanLoadingLoc(false))
+    } else {
+      // Uploaded photo — no GPS, location is optional and entered manually
+      setScanLoadingLoc(false)
+    }
 
     // Compress image before sending — reduces from ~5MB to ~150KB
     const img = new Image()
@@ -807,11 +817,18 @@ export default function App() {
     setScanBusy(true); setScanResult(null); setScanStory(''); setScanShown(''); setScanErr('')
     stopAllAudio()
     try {
-      // Make sure GPS location is ready before identifying (wait up to ~10s)
-      let location = scanLocationRef.current
-      if (!location && scanLoadingLoc) {
-        location = await getScanLocation()
-        setScanLoadingLoc(false)
+      // Build location context depending on source
+      let location = null
+      if (scanIsCamera) {
+        // Make sure GPS location is ready before identifying (wait up to ~10s)
+        location = scanLocationRef.current
+        if (!location && scanLoadingLoc) {
+          location = await getScanLocation()
+          setScanLoadingLoc(false)
+        }
+      } else if (scanManualPlace.trim()) {
+        // Uploaded photo with optional manual place hint
+        location = { city: scanManualPlace.trim() }
       }
 
       // Try Gemini Vision first (better for landmarks), fall back to Groq
@@ -1025,7 +1042,7 @@ export default function App() {
               <div style={{display:'flex',gap:'.5rem'}}>
                 <label style={{flex:1,cursor:'pointer'}}>
                   <input type="file" accept="image/*" capture="environment"
-                    onChange={handleImageSelect}
+                    onChange={(e)=>handleImageSelect(e, true)}
                     style={{display:'none'}}
                   />
                   <div style={{padding:'.8rem',background:'rgba(200,150,62,.08)',border:'2px dashed rgba(200,150,62,.4)',borderRadius:10,textAlign:'center',color:GL,fontFamily:'sans-serif',fontSize:'.72rem',fontWeight:600}}>
@@ -1036,7 +1053,7 @@ export default function App() {
                 </label>
                 <label style={{flex:1,cursor:'pointer'}}>
                   <input type="file" accept="image/*"
-                    onChange={handleImageSelect}
+                    onChange={(e)=>handleImageSelect(e, false)}
                     style={{display:'none'}}
                   />
                   <div style={{padding:'.8rem',background:'rgba(200,150,62,.08)',border:'2px dashed rgba(200,150,62,.4)',borderRadius:10,textAlign:'center',color:GL,fontFamily:'sans-serif',fontSize:'.72rem',fontWeight:600}}>
@@ -1047,6 +1064,14 @@ export default function App() {
               {scanPreview && (
                 <div style={{marginTop:'.75rem',borderRadius:10,overflow:'hidden',maxHeight:220,display:'flex',alignItems:'center',justifyContent:'center',background:'#000'}}>
                   <img src={scanPreview} style={{width:'100%',maxHeight:220,objectFit:'contain'}} alt="preview"/>
+                </div>
+              )}
+              {scanPreview && !scanIsCamera && (
+                <div style={{marginTop:'.6rem'}}>
+                  <input type="text" placeholder="Ciudad o lugar (opcional, ayuda a identificar mejor)"
+                    value={scanManualPlace} onChange={e=>setScanManualPlace(e.target.value)}
+                    style={{width:'100%',background:'rgba(245,239,224,.07)',border:`1px solid ${G}`,borderRadius:8,color:'#f5efe0',fontFamily:'sans-serif',fontSize:'.75rem',padding:'.55rem .8rem',outline:'none'}}
+                  />
                 </div>
               )}
               {scanPreview && (
