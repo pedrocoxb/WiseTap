@@ -25,61 +25,80 @@ const LANG_NAMES = { es:'español', en:'English', fr:'français', it:'italiano',
 const PROMPTS = {
   history: (place, lang, wikiContext) => {
     if (wikiContext) {
-      return `Tienes la siguiente informacion verificada sobre ${place}:
+      return `Eres un narrador de documentales (estilo National Geographic o BBC). Tienes estos datos verificados sobre ${place}:
 
---- FUENTE VERIFICADA ---
+--- DATOS VERIFICADOS ---
 ${wikiContext}
---- FIN FUENTE ---
+--- FIN ---
 
-Tu tarea: escribe una narracion de audioguia de 350-400 palabras en ${LANG_NAMES[lang]||'español'} basandote UNICAMENTE en el texto anterior.
-INSTRUCCIONES:
-1. Extrae y menciona TODAS las fechas concretas que aparezcan (fundacion, eventos importantes, etc.)
-2. Menciona TODOS los personajes y nombres importantes que aparezcan
-3. Explica los eventos historicos mas relevantes mencionados en la fuente
-4. Describe como ha evolucionado el lugar hasta hoy
-5. NO agregues ningun dato que no este en el texto de la fuente
-6. NO uses frases como "se desconoce" — simplemente omite lo que no este en la fuente
-7. Tono directo y claro, sin frases poeticas
-8. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas
-Empieza directamente con el nombre del lugar y su contexto historico.`
+Escribe una narracion de audioguia de 220-260 palabras en ${LANG_NAMES[lang]||'español'}.
+ESTILO: Envolvente, con ritmo variado, que engancha al oyente desde la primera frase. No es una lista de fechas, es una historia que fluye con naturalidad.
+REGLAS ESTRICTAS:
+- Usa UNICAMENTE los datos del texto verificado anterior
+- Incluye las fechas y nombres propios mas importantes que aparezcan
+- Varia la estructura de las frases — no todas pueden empezar igual (evita repetir "En el año X..." una y otra vez)
+- Da contexto humano: que significaron esos eventos para el lugar y su gente
+- NO menciones ni cites las fuentes (nunca digas "segun Wikipedia", "la fuente indica", etc.)
+- NO repitas la misma idea con distintas palabras
+- NO uses frases vagas como "es probable", "se cree que", "no se sabe", "se desconoce"
+- Si un dato no esta en los datos verificados, simplemente no lo menciones — no comentes su ausencia
+- Empieza con una frase que enganche al oyente y lo situe en el lugar
+- Muestra como la historia ha dejado huella hasta hoy
+Todo en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`
     }
-    return `Lugar: ${place}.
-Narra la historia en 350-400 palabras en ${LANG_NAMES[lang]||'español'}.
-REGLAS: Solo incluye datos que conozcas con certeza absoluta. Omite en silencio lo que no sepas. Sin frases poeticas. Todo en ${LANG_NAMES[lang]||'español'}.
-Empieza directamente con el primer dato historico.`
+    return `Eres un narrador de documentales. Narra la historia de ${place} en 220-260 palabras en ${LANG_NAMES[lang]||'español'}.
+ESTILO: Envolvente, como un documental, con ritmo variado.
+REGLAS: Solo datos que conozcas con certeza absoluta. Si no tienes informacion detallada y verificada sobre este lugar especifico, dilo brevemente en una sola frase al inicio (por ejemplo, que es un lugar de interes pero no cuentas con datos historicos detallados sobre el) y no continues inventando. Sin repeticiones. Sin frases vagas. Sin palabras en otros idiomas.
+Empieza directamente con el lugar y su historia.`
   },
 
   legends: (place, lang) =>
-    `Lugar: ${place}.
-Cuenta las leyendas y relatos populares de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
-- La leyenda más famosa del lugar, contada con detalle
-- Otros relatos populares, mitos o supersticiones locales
-- El origen conocido de estas historias
-- Por qué estas leyendas siguen siendo parte de la cultura local
-IMPORTANTE: Deja claro que son relatos populares, no hechos históricos. Empieza directamente con la primera leyenda. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
+    `Eres un narrador de documentales. Cuenta las leyendas y relatos populares de ${place} en 220-260 palabras en ${LANG_NAMES[lang]||'español'}.
+ESTILO: Envolvente y narrativo, con ritmo variado, que engancha al oyente.
+CONTENIDO:
+- La leyenda mas conocida del lugar, contada con detalle
+- Otros relatos populares, mitos o supersticiones locales si existen
+- Por que estas leyendas siguen siendo parte de la cultura local
+REGLAS: Deja claro que son relatos populares, no hechos historicos verificados. Si no conoces leyendas especificas de este lugar, dilo brevemente en una frase y no inventes. NO repitas ideas. NO uses frases vagas. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con la primera leyenda.`,
 
   food: (place, lang) =>
-    `Lugar: ${place}.
-Describe la gastronomía típica de este lugar en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
-- Los 4-5 platos más representativos, con sus ingredientes principales y cómo se preparan
-- Las bebidas típicas de la región
-- Los postres o dulces tradicionales
-- En qué ocasiones o lugares se suelen comer estos platos
-- Una curiosidad gastronómica del lugar
-IMPORTANTE: Información práctica y concreta. Sin metáforas sobre sabores. Empieza directamente con el primer plato. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`,
+    `Eres un narrador de documentales gastronomicos. Describe la gastronomia tipica de ${place} en 220-260 palabras en ${LANG_NAMES[lang]||'español'}.
+ESTILO: Envolvente y concreto, con ritmo variado.
+CONTENIDO:
+- Los platos mas representativos, con sus ingredientes principales
+- Bebidas o postres tipicos de la region
+- En que ocasiones o lugares se suelen comer
+- Una curiosidad gastronomica del lugar si la conoces
+REGLAS: Solo informacion real y verificable. NO repitas ideas. NO uses frases vagas como "es probable" o "se dice que". Si no conoces platos especificos de este lugar exacto, habla de la gastronomia de la region mas cercana que conozcas con certeza. TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con el primer plato.`,
 
   monument: (place, type, city, lang, wikiContext) => {
-    const wikiSection = wikiContext
-      ? `\n\nINFORMACIÓN VERIFICADA DE WIKIPEDIA (úsala como base principal):\n${wikiContext}\n`
-      : ''
-    return `Lugar: ${place}. Tipo: ${type}. Ciudad: ${city}.${wikiSection}
-Narra la historia completa en 350-400 palabras en ${LANG_NAMES[lang]||'español'}:
-- Cuándo fue construido o creado, por quién y con qué propósito
-- Los eventos o personajes históricos más importantes ligados a él, con fechas exactas
-- Sus características arquitectónicas, artísticas o culturales más destacadas
-- Cómo ha cambiado o sido restaurado con el tiempo
-- Por qué es importante visitarlo hoy
-REGLAS CRÍTICAS: ${wikiContext ? 'Basa el relato en la información de Wikipedia proporcionada. NO inventes datos ni fechas que no estén en ese texto.' : 'Solo incluye datos que conozcas con certeza. Si no sabes una fecha exacta, no la menciones.'} TODO en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas. Empieza directamente con los datos.`
+    if (wikiContext) {
+      return `Eres un narrador de documentales (estilo National Geographic o BBC). Tienes estos datos verificados sobre ${place} (${type}, ${city}):
+
+--- DATOS VERIFICADOS ---
+${wikiContext}
+--- FIN ---
+
+Escribe una narracion de audioguia de 220-260 palabras en ${LANG_NAMES[lang]||'español'}.
+ESTILO: Envolvente, con ritmo variado, que engancha al oyente desde la primera frase. No es una lista de fechas, es una historia que fluye con naturalidad.
+REGLAS ESTRICTAS:
+- Usa UNICAMENTE los datos del texto verificado anterior
+- Incluye las fechas y nombres propios mas importantes que aparezcan (arquitectos, personajes, años)
+- Varia la estructura de las frases — no todas pueden empezar igual
+- Describe las caracteristicas mas destacadas mencionadas en los datos
+- Da contexto humano cuando puedas
+- NO menciones ni cites las fuentes (nunca digas "segun Wikipedia", etc.)
+- NO repitas la misma idea con distintas palabras
+- NO uses frases vagas como "es probable", "se cree que", "no se sabe", "se desconoce"
+- Si un dato no esta en los datos verificados, simplemente no lo menciones — no comentes su ausencia
+- Empieza con una frase que enganche al oyente y lo situe en el lugar
+- Termina con algo concreto que el visitante pueda ver o experimentar hoy
+Todo en ${LANG_NAMES[lang]||'español'}, sin palabras en otros idiomas.`
+    }
+    return `Eres un narrador de documentales. Narra la historia de ${place} (${type}, ${city}) en 220-260 palabras en ${LANG_NAMES[lang]||'español'}.
+ESTILO: Envolvente, como un documental, con ritmo variado.
+REGLAS: Solo datos que conozcas con certeza absoluta sobre este lugar especifico. Si no tienes informacion detallada y verificada sobre el, dilo brevemente en una sola frase al inicio (que es un lugar de interes en ${city} pero no cuentas con datos historicos detallados) y no continues inventando. Sin repeticiones. Sin frases vagas. Sin palabras en otros idiomas.
+Empieza directamente con el lugar y su historia.`
   },
 
   famous: (city, lang) => {
@@ -502,6 +521,8 @@ export default function App() {
   const [placeBusy,   setPlaceBusy]   = useState(false)
 
   const [scanLocation, setScanLocation] = useState(null)  // {city, country} from GPS
+  const [scanLoadingLoc, setScanLoadingLoc] = useState(false)
+  const scanLocationRef = useRef(null)
   const [scanImage,    setScanImage]    = useState(null)  // base64
   const [scanMime,     setScanMime]     = useState('')
   const [scanPreview,  setScanPreview]  = useState(null)  // object URL
@@ -720,33 +741,40 @@ export default function App() {
   }
 
   // ── Scan image ────────────────────────────────────────
+  // Returns a Promise<location|null> and also updates state for UI display
   function getScanLocation() {
-    if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(async pos => {
-      try {
-        const { latitude: lat, longitude: lon } = pos.coords
-        const r = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en' } }
-        )
-        const d = await r.json()
-        const a = d.address || {}
-        const road        = a.road || a.pedestrian || a.footway || null
-        const neighbourhood = a.suburb || a.neighbourhood || a.quarter || null
-        const city        = a.city || a.town || a.village || a.municipality || a.county || null
-        const country     = a.country || null
-        const coords      = `${lat.toFixed(5)},${lon.toFixed(5)}`
-        setScanLocation({ road, neighbourhood, city, country, coords, lat, lon })
-      } catch {}
-    }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(null); return }
+      navigator.geolocation.getCurrentPosition(async pos => {
+        try {
+          const { latitude: lat, longitude: lon } = pos.coords
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          )
+          const d = await r.json()
+          const a = d.address || {}
+          const road        = a.road || a.pedestrian || a.footway || null
+          const neighbourhood = a.suburb || a.neighbourhood || a.quarter || null
+          const city        = a.city || a.town || a.village || a.municipality || a.county || null
+          const country     = a.country || null
+          const coords      = `${lat.toFixed(5)},${lon.toFixed(5)}`
+          const loc = { road, neighbourhood, city, country, coords, lat, lon }
+          scanLocationRef.current = loc
+          setScanLocation(loc)
+          resolve(loc)
+        } catch { resolve(null) }
+      }, () => resolve(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
+    })
   }
 
   function handleImageSelect(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setScanResult(null); setScanStory(''); setScanShown(''); setScanErr('')
+    setScanLocation(null); scanLocationRef.current = null; setScanLoadingLoc(true)
     // Get GPS location in background for better identification
-    getScanLocation()
+    getScanLocation().finally(() => setScanLoadingLoc(false))
 
     // Compress image before sending — reduces from ~5MB to ~150KB
     const img = new Image()
@@ -777,13 +805,20 @@ export default function App() {
     setScanBusy(true); setScanResult(null); setScanStory(''); setScanShown(''); setScanErr('')
     stopAllAudio()
     try {
+      // Make sure GPS location is ready before identifying (wait up to ~10s)
+      let location = scanLocationRef.current
+      if (!location && scanLoadingLoc) {
+        location = await getScanLocation()
+        setScanLoadingLoc(false)
+      }
+
       // Try Gemini Vision first (better for landmarks), fall back to Groq
       let result = null
       if (GEMINI_KEY) {
-        result = await askGeminiVision(scanImage, scanMime, GEMINI_KEY, scanLocation)
+        result = await askGeminiVision(scanImage, scanMime, GEMINI_KEY, location)
       }
       if (!result || !result.name) {
-        result = await askGroqVision(scanImage, scanMime, GROQ_KEY, scanLocation)
+        result = await askGroqVision(scanImage, scanMime, GROQ_KEY, location)
       }
       if (!result || !result.name) {
         setScanErr('No se pudo identificar ningún monumento o lugar en la foto. Intenta con otra imagen más clara.')
@@ -993,6 +1028,8 @@ export default function App() {
                   />
                   <div style={{padding:'.8rem',background:'rgba(200,150,62,.08)',border:'2px dashed rgba(200,150,62,.4)',borderRadius:10,textAlign:'center',color:GL,fontFamily:'sans-serif',fontSize:'.72rem',fontWeight:600}}>
                     📷 Sacar foto
+                    {scanLoadingLoc && <div style={{fontSize:'.6rem',color:'rgba(245,239,224,.4)',marginTop:'.2rem'}}>📍 ubicando...</div>}
+                    {!scanLoadingLoc && scanLocation && <div style={{fontSize:'.6rem',color:'rgba(245,239,224,.4)',marginTop:'.2rem'}}>📍 {[scanLocation.road, scanLocation.neighbourhood, scanLocation.city].filter(Boolean).join(', ')}</div>}
                   </div>
                 </label>
                 <label style={{flex:1,cursor:'pointer'}}>
