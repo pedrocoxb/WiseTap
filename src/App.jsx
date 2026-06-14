@@ -36,7 +36,8 @@ ESTILO: Envolvente, con ritmo variado, que engancha al oyente desde la primera f
 REGLAS ESTRICTAS:
 - Usa UNICAMENTE los datos del texto verificado anterior
 - Incluye las fechas y nombres propios mas importantes que aparezcan
-- Varia la estructura de las frases — no todas pueden empezar igual (evita repetir "En el año X..." una y otra vez)
+- LIMITE ESTRICTO: maximo UNA frase en todo el texto puede empezar con "En el año/siglo/ano XXXX". Para todas las demas fechas, integra el año de otra forma (ej: "Roma conquisto la ciudad en el 15 a.C." en vez de "En el 15 a.C., Roma conquisto...")
+- Varia los sujetos de las frases: a veces el lugar, a veces la gente, a veces un evento, a veces un personaje
 - Da contexto humano: que significaron esos eventos para el lugar y su gente
 - NO menciones ni cites las fuentes (nunca digas "segun Wikipedia", "la fuente indica", etc.)
 - NO repitas la misma idea con distintas palabras
@@ -84,7 +85,8 @@ ESTILO: Envolvente, con ritmo variado, que engancha al oyente desde la primera f
 REGLAS ESTRICTAS:
 - Usa UNICAMENTE los datos del texto verificado anterior
 - Incluye las fechas y nombres propios mas importantes que aparezcan (arquitectos, personajes, años)
-- Varia la estructura de las frases — no todas pueden empezar igual
+- LIMITE ESTRICTO: maximo UNA frase en todo el texto puede empezar con "En el año/siglo/ano XXXX". Para todas las demas fechas, integra el año de otra forma (ej: "Construido en 1916 por..." o "El arquitecto X lo diseno en 1916" en vez de "En 1916, se construyo...")
+- Varia los sujetos de las frases: a veces el lugar, a veces el arquitecto, a veces un evento
 - Describe las caracteristicas mas destacadas mencionadas en los datos
 - Da contexto humano cuando puedas
 - NO menciones ni cites las fuentes (nunca digas "segun Wikipedia", etc.)
