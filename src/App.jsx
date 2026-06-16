@@ -150,9 +150,25 @@ async function askGeminiVision(imageBase64, mimeType, key, location) {
       if (location.city) parts.push(location.city)
       if (location.country) parts.push(location.country)
       if (location.coords) parts.push(`GPS: ${location.coords}`)
-      return `IMPORTANT CONTEXT: The photo was taken at this exact location: ${parts.join(', ')}. Use this precise location to identify the exact landmark in the photo — cross-reference the street address with known monuments in that area.`
+      return `CRITICAL GPS CONTEXT: The photo was taken at EXACTLY this location: ${parts.join(', ')}. This is the MOST IMPORTANT clue — the landmark MUST be physically located at or very near this street address. Do NOT identify landmarks that are far from this location, even if they look visually similar. Search your knowledge for monuments, churches, buildings or places of interest that are actually located on or near ${parts.slice(0,2).join(', ')}.`
     })() : ''
-    const prompt = `Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible — use the exact official name. ${locationHint} Respond with ONLY this JSON, no markdown, no extra text: {"name": "exact official name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify a specific landmark, set name to null.`
+    const prompt = `Analyze this image carefully and in detail before identifying the landmark.
+
+STEP 1 - VISUAL ANALYSIS: Examine these details in the image:
+- Architectural style (gothic, baroque, romanesque, modernist, neoclassical, etc.)
+- Building materials (stone type, color, brick, marble, etc.)
+- Distinctive features (towers, domes, spires, arches, columns, facades, inscriptions, statues, symbols)
+- Surrounding environment (square, street, garden, waterfront, etc.)
+- Any visible text, signs or inscriptions on the building
+- Number of towers, windows, doors and their style
+
+STEP 2 - IDENTIFICATION: Based on those specific visual details, identify the exact landmark.
+${locationHint}
+
+Respond with ONLY this JSON, no markdown, no extra text:
+{"name": "exact official name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low", "visual_clues": "key visual details that led to this identification"}
+
+If you cannot identify it with confidence, set name to null.`
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
@@ -166,7 +182,7 @@ async function askGeminiVision(imageBase64, mimeType, key, location) {
               { text: prompt }
             ]
           }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 300 }
+          generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
         })
       }
     )
@@ -197,10 +213,26 @@ async function askGroqVision(imageBase64, mimeType, key, location) {
     if (location.city) parts.push(location.city)
     if (location.country) parts.push(location.country)
     if (location.coords) parts.push(`GPS: ${location.coords}`)
-    return `IMPORTANT CONTEXT: The photo was taken at this exact location: ${parts.join(', ')}. Use this precise location to identify the exact landmark — cross-reference the street address with known monuments in that area.`
+    return `CRITICAL GPS CONTEXT: The photo was taken at EXACTLY this location: ${parts.join(', ')}. This is the MOST IMPORTANT clue — the landmark MUST be physically located at or very near this street address. Do NOT identify landmarks that are far from this location, even if they look visually similar. Search your knowledge for monuments, churches, buildings or places of interest that are actually located on or near ${parts.slice(0,2).join(', ')}.`
   })() : ''
-  const systemPrompt = 'You are an expert in world architecture, monuments and landmarks. Identify specific places from photos. Always respond with valid JSON only, no markdown, no extra text.'
-  const userPrompt = `Look carefully at this image. Identify the specific monument, landmark, building or place of interest shown. Be as specific as possible. ${locationHint} Respond with ONLY this JSON: {"name": "exact specific name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}. If you cannot identify it, set name to null.`
+  const systemPrompt = 'You are an expert in world architecture, monuments and landmarks. When GPS location is provided, it is the MOST IMPORTANT factor — only identify landmarks that are physically near that location. Never guess a landmark from a different part of the city. Respond with valid JSON only, no markdown, no extra text.'
+  const userPrompt = `Analyze this image carefully and in detail before identifying the landmark.
+
+STEP 1 - VISUAL ANALYSIS: Examine these details:
+- Architectural style (gothic, baroque, romanesque, modernist, neoclassical, etc.)
+- Building materials and colors
+- Distinctive features (towers, domes, spires, arches, columns, facades, inscriptions, statues)
+- Surrounding environment (square, street, garden, waterfront, etc.)
+- Any visible text, signs or inscriptions
+- Number and style of towers, windows, doors
+
+STEP 2 - IDENTIFICATION: Based on those specific visual details, identify the exact landmark.
+${locationHint}
+
+Respond with ONLY this JSON, no markdown, no extra text:
+{"name": "exact specific name", "type": "monument/church/museum/palace/bridge/square/etc", "city": "city name", "country": "country name", "confidence": "high/medium/low"}
+
+If you cannot identify it with confidence, set name to null.`
 
   for (const model of VISION_MODELS) {
     try {
